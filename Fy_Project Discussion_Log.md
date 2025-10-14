@@ -1,8 +1,9 @@
+---
 # Complete Project Discussion Log
 ## Blockchain-Based Audit Trails for Synthetic Data Generation
 
 ---
-
+---
 ## Session 1: Initial Project Analysis & Roadmap
 
 ### Date: October 14, 2025
@@ -96,9 +97,9 @@ Real World                  Blockchain
 │         (Validates the Synthetic Data Itself)        │
 │  ┌────────────────────────────────────────────────┐  │
 │  │ 1. Privacy Metrics (DCR, k-anonymity)          │  │
-│  │ 2. Utility Metrics (Wasserstein, ML efficacy) │  │
-│  │ 3. Statistical Tests (KS test, correlation)   │  │
-│  │ 4. Bias Detection (Demographic parity)        │  │
+│  │ 2. Utility Metrics (Wasserstein, ML efficacy)  │  │
+│  │ 3. Statistical Tests (KS test, correlation)    │  │
+│  │ 4. Bias Detection (Demographic parity)         │  │
 │  └────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────┘
 ```
@@ -111,8 +112,8 @@ Real World                  Blockchain
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     USER/RESEARCHER LAYER                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│                     USER/RESEARCHER LAYER                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
 │  │  Generator   │  │   Auditor    │  │  Regulator   │          │
 │  │   Portal     │  │   Dashboard  │  │   Portal     │          │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘          │
