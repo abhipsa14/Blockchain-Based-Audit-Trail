@@ -1,0 +1,34 @@
+#Synthetic Data Generation
+sdv
+ctgan
+
+#Data Processing
+pandas
+numpy
+scipy
+scikit-learn
+
+#Privacy & Fairness Metrics
+anonymeter==1.0.0
+aif360
+
+#Visualization
+matplotlib
+seaborn
+plotly
+
+# Web Dashboard
+flask
+flask-cors
+
+# Blockchain Integration
+grpcio
+protobuf
+
+# Testing
+pytest
+pytest-cov
+
+# Utilities
+python-dotenv
+pyyaml
