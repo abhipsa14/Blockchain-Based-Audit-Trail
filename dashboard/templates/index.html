@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synthetic Data Verification Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: var(--primary-gradient);
+        }
+        
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card-header {
+            background: var(--primary-gradient);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            font-weight: 600;
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        .status-approved {
+            background: var(--success-gradient);
+            color: white;
+        }
+        
+        .status-pending {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .status-rejected {
+            background: var(--warning-gradient);
+            color: white;
+        }
+        
+        .progress {
+            height: 10px;
+            border-radius: 5px;
+        }
+        
+        .btn-gradient {
+            background: var(--primary-gradient);
+            border: none;
+            color: white;
+            padding: 10px 30px;
+            border-radius: 25px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-gradient:hover {
+            transform: scale(1.05);
+            color: white;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .upload-zone {
+            border: 2px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-zone:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+        
+        .audit-entry {
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-radius: 0 10px 10px 0;
+        }
+        
+        .timeline-item {
+            position: relative;
+            padding-left: 30px;
+            margin-bottom: 20px;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 5px;
+            width: 15px;
+            height: 15px;
+            background: var(--primary-gradient);
+            border-radius: 50%;
+        }
+        
+        .timeline-item::after {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 20px;
+            width: 2px;
+            height: calc(100% + 10px);
+            background: #e9ecef;
+        }
+        
+        .timeline-item:last-child::after {
+            display: none;
+        }
+        
+        #loading {
+            display: none;
+        }
+        
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-shield-check me-2"></i>
+                Synthetic Data Verifier
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link active" href="#" onclick="showSection('upload')">Upload</a>
+                <a class="nav-link" href="#" onclick="showSection('results')">Results</a>
+                <a class="nav-link" href="#" onclick="showSection('audit')">Audit Trail</a>
+                <a class="nav-link" href="#" onclick="showSection('blockchain')">Blockchain</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container my-5">
+        <!-- Loading Overlay -->
+        <div id="loading" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Processing verification...</p>
+        </div>
+
+        <!-- Upload Section -->
+        <section id="upload-section">
+            <div class="row">
+                <div class="col-lg-8 mx-auto">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="bi bi-cloud-upload me-2"></i>
+                            Upload Datasets for Verification
+                        </div>
+                        <div class="card-body p-4">
+                            <form id="uploadForm">
+                                <div class="row g-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Real Dataset (CSV)</label>
+                                        <div class="upload-zone" onclick="document.getElementById('realFile').click()">
+                                            <i class="bi bi-file-earmark-spreadsheet fs-1 text-primary"></i>
+                                            <p class="mt-2 mb-0" id="realFileLabel">Click to upload real data</p>
+                                        </div>
+                                        <input type="file" id="realFile" accept=".csv" class="d-none" onchange="updateLabel('real')">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Synthetic Dataset (CSV)</label>
+                                        <div class="upload-zone" onclick="document.getElementById('syntheticFile').click()">
+                                            <i class="bi bi-file-earmark-spreadsheet fs-1 text-primary"></i>
+                                            <p class="mt-2 mb-0" id="syntheticFileLabel">Click to upload synthetic data</p>
+                                        </div>
+                                        <input type="file" id="syntheticFile" accept=".csv" class="d-none" onchange="updateLabel('synthetic')">
+                                    </div>
+                                </div>
+                                
+                                <hr class="my-4">
+                                
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Categorical Columns</label>
+                                        <input type="text" class="form-control" id="categoricalCols" placeholder="col1, col2, col3">
+                                        <small class="text-muted">Comma-separated column names</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Protected Attributes</label>
+                                        <input type="text" class="form-control" id="protectedAttrs" placeholder="gender, race">
+                                        <small class="text-muted">For bias detection</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Target Column</label>
+                                        <input type="text" class="form-control" id="targetCol" placeholder="target">
+                                        <small class="text-muted">For ML efficacy evaluation</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Number of Verifiers</label>
+                                        <select class="form-select" id="numVerifiers">
+                                            <option value="3">3 Verifiers</option>
+                                            <option value="5">5 Verifiers</option>
+                                            <option value="7">7 Verifiers</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="text-center mt-4">
+                                    <button type="button" class="btn btn-gradient btn-lg" onclick="uploadAndVerify()">
+                                        <i class="bi bi-shield-check me-2"></i>
+                                        Run Verification
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results-section" style="display: none;">
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <div class="metric-value" id="privacyScore">--</div>
+                        <div class="metric-label">Privacy Score</div>
+                        <div class="progress mt-2">
+                            <div class="progress-bar bg-success" id="privacyBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <div class="metric-value" id="utilityScore">--</div>
+                        <div class="metric-label">Utility Score</div>
+                        <div class="progress mt-2">
+                            <div class="progress-bar bg-info" id="utilityBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <div class="metric-value" id="biasScore">--</div>
+                        <div class="metric-label">Fairness Score</div>
+                        <div class="progress mt-2">
+                            <div class="progress-bar bg-warning" id="biasBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <div class="metric-value" id="overallScore">--</div>
+                        <div class="metric-label">Overall Score</div>
+                        <div class="progress mt-2">
+                            <div class="progress-bar bg-primary" id="overallBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="bi bi-graph-up me-2"></i>
+                            Verification Status
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center py-4">
+                                <span class="status-badge" id="statusBadge">Pending</span>
+                            </div>
+                            <hr>
+                            <div id="consensusDetails">
+                                <p><strong>Request ID:</strong> <span id="requestId">--</span></p>
+                                <p><strong>Verifiers:</strong> <span id="verifierCount">--</span></p>
+                                <p><strong>Consensus:</strong> <span id="consensusScore">--</span></p>
+                                <p><strong>Data Hash:</strong> <code id="dataHash">--</code></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="bi bi-file-text me-2"></i>
+                            Compliance
+                        </div>
+                        <div class="card-body">
+                            <div id="complianceChecks">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span>GDPR Compliance</span>
+                                    <span class="badge bg-secondary" id="gdprStatus">--</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span>Privacy Requirements</span>
+                                    <span class="badge bg-secondary" id="privacyStatus">--</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span>Utility Requirements</span>
+                                    <span class="badge bg-secondary" id="utilityStatus">--</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>Fairness Requirements</span>
+                                    <span class="badge bg-secondary" id="fairnessStatus">--</span>
+                                </div>
+                            </div>
+                            <hr>
+                            <button class="btn btn-outline-primary w-100" onclick="downloadReport()">
+                                <i class="bi bi-download me-2"></i>Download Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Audit Trail Section -->
+        <section id="audit-section" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-journal-text me-2"></i>
+                    Audit Trail
+                </div>
+                <div class="card-body">
+                    <div id="auditTimeline">
+                        <p class="text-muted">No audit entries yet. Run a verification to see the audit trail.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Blockchain Section -->
+        <section id="blockchain-section" style="display: none;">
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="metric-card">
+                        <div class="metric-value" id="blockCount">0</div>
+                        <div class="metric-label">Total Blocks</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="metric-card">
+                        <div class="metric-value" id="entryCount">0</div>
+                        <div class="metric-label">Audit Entries</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="metric-card">
+                        <div class="metric-value" id="chainValid">--</div>
+                        <div class="metric-label">Chain Status</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card mt-4">
+                <div class="card-header">
+                    <i class="bi bi-link-45deg me-2"></i>
+                    Blockchain Explorer
+                </div>
+                <div class="card-body">
+                    <div id="blockchainBlocks">
+                        <p class="text-muted">Loading blockchain data...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentUploadId = null;
+        let currentRequestId = null;
+
+        function showSection(section) {
+            document.querySelectorAll('section').forEach(s => s.style.display = 'none');
+            document.getElementById(section + '-section').style.display = 'block';
+            
+            if (section === 'blockchain') {
+                loadBlockchainStats();
+            }
+        }
+
+        function updateLabel(type) {
+            const input = document.getElementById(type + 'File');
+            const label = document.getElementById(type + 'FileLabel');
+            if (input.files.length > 0) {
+                label.textContent = input.files[0].name;
+            }
+        }
+
+        async function uploadAndVerify() {
+            const realFile = document.getElementById('realFile').files[0];
+            const syntheticFile = document.getElementById('syntheticFile').files[0];
+            
+            if (!realFile || !syntheticFile) {
+                alert('Please upload both datasets');
+                return;
+            }
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('upload-section').style.display = 'none';
+
+            try {
+                // Upload data
+                const formData = new FormData();
+                formData.append('real_file', realFile);
+                formData.append('synthetic_file', syntheticFile);
+                formData.append('categorical_columns', document.getElementById('categoricalCols').value);
+                formData.append('protected_attributes', document.getElementById('protectedAttrs').value);
+                formData.append('target_column', document.getElementById('targetCol').value);
+
+                const uploadResponse = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const uploadResult = await uploadResponse.json();
+                
+                if (uploadResult.error) {
+                    throw new Error(uploadResult.error);
+                }
+
+                currentUploadId = uploadResult.upload_id;
+
+                // Run verification
+                const verifyResponse = await fetch('/api/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        upload_id: currentUploadId,
+                        num_verifiers: parseInt(document.getElementById('numVerifiers').value)
+                    })
+                });
+                const verifyResult = await verifyResponse.json();
+                
+                if (verifyResult.error) {
+                    throw new Error(verifyResult.error);
+                }
+
+                currentRequestId = verifyResult.request_id;
+                displayResults(verifyResult.verification_result);
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+                showSection('upload');
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function displayResults(result) {
+            showSection('results');
+            
+            const consensus = result.consensus || {};
+            const scores = consensus.final_scores || {};
+            
+            // Update scores
+            updateScore('privacy', scores.privacy_score);
+            updateScore('utility', scores.utility_score);
+            updateScore('bias', scores.bias_score);
+            updateScore('overall', scores.overall_score);
+            
+            // Update status
+            const approved = consensus.approved || false;
+            const statusBadge = document.getElementById('statusBadge');
+            statusBadge.textContent = approved ? 'APPROVED' : 'REJECTED';
+            statusBadge.className = 'status-badge ' + (approved ? 'status-approved' : 'status-rejected');
+            
+            // Update consensus details
+            document.getElementById('requestId').textContent = currentRequestId || '--';
+            document.getElementById('verifierCount').textContent = consensus.num_verifiers || '--';
+            document.getElementById('consensusScore').textContent = 
+                consensus.consensus_score ? consensus.consensus_score.toFixed(2) + '%' : '--';
+            document.getElementById('dataHash').textContent = result.data_hash ? result.data_hash.substring(0, 16) + '...' : '--';
+            
+            // Update compliance
+            updateComplianceStatus(scores);
+            
+            // Load audit trail
+            loadAuditTrail();
+        }
+
+        function updateScore(type, score) {
+            const scoreEl = document.getElementById(type + 'Score');
+            const barEl = document.getElementById(type + 'Bar');
+            
+            if (score !== undefined && score !== null) {
+                scoreEl.textContent = score.toFixed(1);
+                barEl.style.width = score + '%';
+            }
+        }
+
+        function updateComplianceStatus(scores) {
+            const privacyPass = scores.privacy_score >= 70;
+            const utilityPass = scores.utility_score >= 70;
+            const biasPass = scores.bias_score >= 70;
+            const gdprPass = privacyPass && scores.privacy_score >= 80;
+            
+            document.getElementById('privacyStatus').textContent = privacyPass ? 'PASS' : 'FAIL';
+            document.getElementById('privacyStatus').className = 'badge ' + (privacyPass ? 'bg-success' : 'bg-danger');
+            
+            document.getElementById('utilityStatus').textContent = utilityPass ? 'PASS' : 'FAIL';
+            document.getElementById('utilityStatus').className = 'badge ' + (utilityPass ? 'bg-success' : 'bg-danger');
+            
+            document.getElementById('fairnessStatus').textContent = biasPass ? 'PASS' : 'FAIL';
+            document.getElementById('fairnessStatus').className = 'badge ' + (biasPass ? 'bg-success' : 'bg-danger');
+            
+            document.getElementById('gdprStatus').textContent = gdprPass ? 'COMPLIANT' : 'NON-COMPLIANT';
+            document.getElementById('gdprStatus').className = 'badge ' + (gdprPass ? 'bg-success' : 'bg-warning');
+        }
+
+        async function loadAuditTrail() {
+            if (!currentRequestId) return;
+            
+            try {
+                const response = await fetch('/api/audit/' + currentRequestId);
+                const result = await response.json();
+                
+                const timeline = document.getElementById('auditTimeline');
+                const entries = result.audit_trail || [];
+                
+                if (entries.length === 0) {
+                    timeline.innerHTML = '<p class="text-muted">No audit entries found.</p>';
+                    return;
+                }
+                
+                timeline.innerHTML = entries.map(entry => `
+                    <div class="timeline-item">
+                        <strong>${entry.event_type || 'Event'}</strong>
+                        <p class="text-muted mb-1">${entry.timestamp || '--'}</p>
+                        <p class="mb-0">${JSON.stringify(entry.details || {}, null, 2)}</p>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error loading audit trail:', error);
+            }
+        }
+
+        async function loadBlockchainStats() {
+            try {
+                const response = await fetch('/api/blockchain/stats');
+                const result = await response.json();
+                
+                const blockchain = result.blockchain || {};
+                document.getElementById('blockCount').textContent = blockchain.total_blocks || 0;
+                document.getElementById('entryCount').textContent = blockchain.total_entries || 0;
+                document.getElementById('chainValid').textContent = blockchain.is_valid ? 'Valid' : 'Invalid';
+                
+            } catch (error) {
+                console.error('Error loading blockchain stats:', error);
+            }
+        }
+
+        async function downloadReport() {
+            if (!currentRequestId) {
+                alert('No verification to download');
+                return;
+            }
+            window.location.href = '/api/compliance/' + currentRequestId + '/download';
+        }
+
+        // Initial load
+        loadBlockchainStats();
+    </script>
+</body>
+</html>

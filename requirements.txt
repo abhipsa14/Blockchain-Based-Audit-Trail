@@ -9,7 +9,8 @@ scipy
 scikit-learn
 
 #Privacy & Fairness Metrics
-anonymeter==1.0.0
+# anonymeter
+sdmetrics
 aif360
 
 #Visualization
