@@ -1,0 +1,48 @@
+{
+  "baseline": {
+    "approach": "baseline",
+    "num_trials": 5,
+    "latency": {
+      "mean": 0.00229496955871582,
+      "std": 0.0014192576274453161,
+      "min": 0.0,
+      "max": 0.0041124820709228516
+    },
+    "trust_score": {
+      "mean": 0.0,
+      "std": 0.0
+    },
+    "tamper_resistant": false
+  },
+  "centralized": {
+    "approach": "centralized",
+    "num_trials": 5,
+    "latency": {
+      "mean": 1.886982250213623,
+      "std": 0.27001318843533434,
+      "min": 1.5637056827545166,
+      "max": 2.262828826904297
+    },
+    "trust_score": {
+      "mean": 35.8337830656794,
+      "std": 0.0
+    },
+    "tamper_resistant": false
+  },
+  "blockchain": {
+    "approach": "blockchain",
+    "num_trials": 5,
+    "latency": {
+      "mean": 4.193372583389282,
+      "std": 0.42105605017996106,
+      "min": 3.869776487350464,
+      "max": 5.007879257202148
+    },
+    "trust_score": {
+      "mean": 53.67307754746059,
+      "std": 0.7954853179045873
+    },
+    "tamper_resistant": true
+  },
+  "timestamp": "2025-12-17T09:00:56.435621"
+}
