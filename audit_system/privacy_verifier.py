@@ -246,11 +246,11 @@ class PrivacyVerifier:
         
         for col in sensitive_cols:
             # Get value distributions
-            real_dist = self.real_data[col].value_counts(normalize=True)
-            synth_dist = self.synthetic_data[col].value_counts(normalize=True)
+            real_dist = self.real_data[col].value_counts(normalize=True).to_dict()
+            synth_dist = self.synthetic_data[col].value_counts(normalize=True).to_dict()
             
             # Align distributions
-            all_values = set(real_dist.index) | set(synth_dist.index)
+            all_values = set(real_dist.keys()) | set(synth_dist.keys())
             real_aligned = pd.Series({v: real_dist.get(v, 0) for v in all_values})
             synth_aligned = pd.Series({v: synth_dist.get(v, 0) for v in all_values})
             
