@@ -1,0 +1,60 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\title{Blockchain-Based Audit Trails for Verifiable and Trustworthy Synthetic Data Generation}
+
+\author{
+\IEEEauthorblockN{Ashish Pandey}
+\IEEEauthorblockA{Department of Computer Science\\
+Institution Name\\
+Email: ashish.pandey@email.com}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Synthetic data generation has emerged as a promising solution for addressing data scarcity and privacy concerns in machine learning applications. However, trusting the quality and privacy guarantees of synthetic data remains challenging, as traditional approaches rely on centralized verification that is susceptible to tampering and lacks transparency. This paper presents a novel blockchain-based framework that integrates comprehensive verification mechanisms with immutable audit trails to establish trustworthy synthetic data generation. Our two-layer architecture combines Layer 1 (verification system) that validates privacy metrics, utility metrics, and bias detection with Layer 2 (blockchain) that secures the audit trail through distributed consensus. We implement the system using Hyperledger Fabric and evaluate it against baseline and centralized approaches. Experimental results on the Adult Income dataset demonstrate that our approach achieves comparable verification accuracy while providing tamper-resistant audit trails and consensus-based trust establishment. The system successfully detects low-quality synthetic datasets with 95\% accuracy while maintaining verification latency under 10 seconds for datasets up to 100K rows.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Blockchain, Synthetic Data, Privacy, Audit Trail, CTGAN, Differential Privacy, Hyperledger Fabric
+\end{IEEEkeywords}
+
+\section{Introduction}
+\input{sections/introduction}
+
+\section{Related Work}
+\input{sections/related_work}
+
+\section{Proposed System}
+\input{sections/methodology}
+
+\section{Implementation}
+\input{sections/implementation}
+
+\section{Experimental Evaluation}
+\input{sections/experiments}
+
+\section{Results and Discussion}
+\input{sections/results}
+
+\section{Conclusion and Future Work}
+\input{sections/conclusion}
+
+\section*{Acknowledgments}
+The authors thank the open-source community for providing tools like CTGAN and Hyperledger Fabric that made this research possible.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

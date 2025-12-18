@@ -1,0 +1,114 @@
+% Methodology Section
+
+\subsection{System Overview}
+
+We propose a two-layer architecture that separates verification logic from audit trail security:
+
+\begin{itemize}
+    \item \textbf{Layer 1 (Verification System):} Validates synthetic data quality through objective metrics
+    \item \textbf{Layer 2 (Blockchain):} Secures the verification results in an immutable, distributed ledger
+\end{itemize}
+
+\subsection{Layer 1: Verification System}
+
+\subsubsection{Privacy Verification}
+The privacy module evaluates four key metrics:
+
+\textbf{1. Distance to Closest Record (DCR):}
+\begin{equation}
+DCR(s) = \min_{r \in R} d(s, r)
+\end{equation}
+where $s$ is a synthetic record, $R$ is the set of real records, and $d$ is a distance function (Euclidean for numerical, Hamming for categorical).
+
+\textbf{2. k-Anonymity:}
+For quasi-identifier columns $Q$, we verify:
+\begin{equation}
+\forall q \in Q: |S_q| \geq k
+\end{equation}
+where $S_q$ is the set of records sharing quasi-identifier values $q$.
+
+\textbf{3. Membership Inference Attack (MIA):}
+We train a binary classifier to distinguish real from synthetic records:
+\begin{equation}
+MIA_{acc} = \frac{TP + TN}{TP + TN + FP + FN}
+\end{equation}
+Privacy is preserved if $MIA_{acc} \approx 0.5$ (random guessing).
+
+\textbf{4. Attribute Disclosure Risk:}
+Measures similarity in sensitive attribute distributions using Total Variation distance.
+
+\subsubsection{Utility Verification}
+The utility module measures data usefulness:
+
+\textbf{1. Statistical Similarity:}
+Using Wasserstein distance (Earth Mover's Distance):
+\begin{equation}
+W_p(P_r, P_s) = \left( \inf_{\gamma \in \Gamma(P_r, P_s)} \int |x-y|^p d\gamma(x,y) \right)^{1/p}
+\end{equation}
+
+\textbf{2. Correlation Preservation:}
+\begin{equation}
+\Delta_{corr} = \frac{1}{n^2} \sum_{i,j} |corr_r(i,j) - corr_s(i,j)|
+\end{equation}
+
+\textbf{3. ML Efficacy (TSTR):}
+Train on Synthetic, Test on Real accuracy compared to Train on Real, Test on Real:
+\begin{equation}
+ML_{efficacy} = \frac{Acc_{TSTR}}{Acc_{TRTR}}
+\end{equation}
+
+\subsubsection{Bias Detection}
+The fairness module evaluates:
+
+\textbf{1. Demographic Parity:}
+\begin{equation}
+DP = |P(\hat{Y}=1|A=0) - P(\hat{Y}=1|A=1)|
+\end{equation}
+where $A$ is the protected attribute.
+
+\textbf{2. Disparate Impact:}
+\begin{equation}
+DI = \frac{P(\hat{Y}=1|A=0)}{P(\hat{Y}=1|A=1)}
+\end{equation}
+Acceptable range: $[0.8, 1.25]$ (80\% rule).
+
+\subsection{Layer 2: Blockchain Consensus}
+
+\subsubsection{Consensus Algorithm}
+We implement a weighted median consensus:
+
+\begin{algorithm}
+\caption{Verification Consensus}
+\begin{algorithmic}[1]
+\REQUIRE Verification results $V = \{v_1, ..., v_n\}$ from $n$ verifiers
+\ENSURE Consensus record $C$
+\FOR{each metric $m$ in \{privacy, utility, bias\}}
+    \STATE $scores_m \leftarrow [v_i.m \text{ for } v_i \in V]$
+    \STATE $C.m \leftarrow median(scores_m)$
+\ENDFOR
+\STATE $C.overall \leftarrow \frac{C.privacy + C.utility + C.bias}{3}$
+\IF{$C.overall \geq threshold$}
+    \STATE $C.status \leftarrow APPROVED$
+\ELSE
+    \STATE $C.status \leftarrow REJECTED$
+\ENDIF
+\RETURN $C$
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Smart Contract Functions}
+The blockchain layer implements three core functions:
+\begin{itemize}
+    \item \texttt{SubmitVerification}: Individual verifiers submit results
+    \item \texttt{QueryConsensus}: Retrieve aggregated verification results
+    \item \texttt{VerifyIntegrity}: Auditors verify data hasn't been tampered
+\end{itemize}
+
+\subsection{Regulatory Compliance}
+
+The system automatically checks compliance with:
+\begin{itemize}
+    \item \textbf{GDPR Article 25:} Privacy by design verification
+    \item \textbf{EU AI Act:} Bias detection and documentation
+    \item \textbf{HIPAA:} De-identification verification (k-anonymity $\geq 5$)
+\end{itemize}

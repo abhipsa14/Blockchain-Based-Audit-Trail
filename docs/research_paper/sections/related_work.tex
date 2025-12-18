@@ -1,0 +1,51 @@
+% Related Work Section
+
+This section reviews existing work in synthetic data generation, blockchain-based data management, and privacy-preserving machine learning.
+
+\subsection{Synthetic Data Generation}
+
+\subsubsection{GAN-based Approaches}
+Generative Adversarial Networks (GANs) have revolutionized synthetic data generation. CTGAN \cite{xu2019ctgan} introduced mode-specific normalization for handling mixed-type tabular data, addressing mode collapse issues common in vanilla GANs. CTAB-GAN+ \cite{zhao2022ctabgan} further improved tabular synthesis through auxiliary classifier loss and training-by-sampling strategies.
+
+\subsubsection{Privacy-Preserving Generation}
+PATE-GAN \cite{jordon2018pate} pioneered differentially private synthetic data generation using teacher ensemble methods. DP-CGAN \cite{torkzadehmahani2020dp} extended this to conditional generation, while DTGAN \cite{kunar2021dtgan} optimized differential privacy specifically for tabular data.
+
+\subsection{Blockchain for Data Provenance}
+
+\subsubsection{Permissioned Blockchain Frameworks}
+Hyperledger Fabric \cite{androulaki2018hyperledger} provides enterprise-grade permissioned blockchain with modular consensus and smart contract support. BLOCKBENCH \cite{dinh2017blockbench} established benchmarking frameworks for evaluating private blockchain performance.
+
+\subsubsection{Blockchain for AI Transparency}
+Recent work has explored blockchain for AI model provenance and audit trails. Veeraragavan et al. \cite{veeraragavan2024blockchain} proposed a permissioned blockchain framework for ranking synthetic data generators based on user reputation. However, their approach relies on post-hoc user ratings rather than objective quality verification.
+
+\subsection{Privacy Metrics and Evaluation}
+
+\subsubsection{Distance-based Metrics}
+Distance to Closest Record (DCR) measures the minimum distance between synthetic and real records to prevent memorization. However, recent work \cite{yao2025dcr} has shown that DCR alone is insufficient for privacy guarantees.
+
+\subsubsection{Attack-based Evaluation}
+Membership Inference Attacks (MIA) \cite{ward2025synthmia} provide more robust privacy evaluation by testing whether attackers can determine if specific records were in the training set. Our system incorporates both distance-based and attack-based metrics.
+
+\subsection{Research Gap}
+
+Existing approaches suffer from several limitations:
+
+\begin{table}[h]
+\centering
+\caption{Comparison with Existing Approaches}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Feature} & \textbf{Centralized} & \textbf{Reputation} & \textbf{Ours} \\
+\midrule
+Pre-commit Verification & \checkmark & $\times$ & \checkmark \\
+Objective Metrics & \checkmark & $\times$ & \checkmark \\
+Tamper Resistance & $\times$ & \checkmark & \checkmark \\
+Distributed Consensus & $\times$ & $\times$ & \checkmark \\
+Reproducible Auditing & $\times$ & $\times$ & \checkmark \\
+Regulatory Compliance & Partial & $\times$ & \checkmark \\
+\bottomrule
+\end{tabular}
+\label{tab:comparison}
+\end{table}
+
+Our work addresses these gaps by combining objective verification metrics with blockchain-based consensus and immutable audit trails.

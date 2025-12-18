@@ -1,0 +1,137 @@
+% Implementation Section
+
+\subsection{Technology Stack}
+
+Our implementation uses the following technologies:
+
+\begin{table}[h]
+\centering
+\caption{Technology Stack}
+\begin{tabular}{ll}
+\toprule
+\textbf{Component} & \textbf{Technology} \\
+\midrule
+Synthetic Data Generation & CTGAN (SDV library) \\
+Privacy Verification & Custom Python module \\
+Utility Verification & Scikit-learn, SciPy \\
+Bias Detection & Custom fairness metrics \\
+Blockchain Platform & Hyperledger Fabric 2.5 \\
+Consensus & RAFT (dev) / PBFT (prod) \\
+API Gateway & Flask/FastAPI \\
+Dashboard & Flask + Bootstrap \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Auditable CTGAN}
+
+We extend the standard CTGAN with audit logging capabilities:
+
+\begin{lstlisting}[language=Python, caption=Auditable CTGAN Structure]
+class AuditableCTGAN:
+    def __init__(self, epochs=100):
+        self.model = CTGAN(epochs=epochs)
+        self.audit_logs = []
+        
+    def fit(self, data, discrete_columns):
+        self.input_hash = compute_hash(data)
+        self.model.fit(data, discrete_columns)
+        self.log_training_event()
+        
+    def sample(self, n_samples):
+        synthetic = self.model.sample(n_samples)
+        self.output_hash = compute_hash(synthetic)
+        self.log_generation_event()
+        return synthetic
+\end{lstlisting}
+
+\subsection{Verification Modules}
+
+Each verification module follows a consistent interface:
+
+\begin{lstlisting}[language=Python, caption=Verifier Interface]
+class BaseVerifier:
+    def __init__(self, real_data, synthetic_data):
+        self.real_data = real_data
+        self.synthetic_data = synthetic_data
+        
+    def verify_all(self) -> Dict:
+        """Run all verification checks"""
+        raise NotImplementedError
+        
+    def get_score(self) -> float:
+        """Return overall score 0-100"""
+        raise NotImplementedError
+\end{lstlisting}
+
+\subsection{Blockchain Integration}
+
+The blockchain client provides a unified interface for both simulation and production modes:
+
+\begin{lstlisting}[language=Python, caption=Blockchain Client]
+class BlockchainClient:
+    def __init__(self, mode=BlockchainMode.SIMULATION):
+        if mode == BlockchainMode.SIMULATION:
+            self.backend = SimulatedBlockchain()
+        else:
+            self.backend = HyperledgerFabric()
+            
+    def log_verification(self, data_hash, results):
+        transaction = {
+            'data_hash': data_hash,
+            'results': results,
+            'timestamp': datetime.now().isoformat()
+        }
+        return self.backend.submit_transaction(transaction)
+\end{lstlisting}
+
+\subsection{Consensus Engine}
+
+The consensus engine aggregates results from multiple verifiers:
+
+\begin{lstlisting}[language=Python, caption=Consensus Engine]
+class ConsensusEngine:
+    def __init__(self, num_verifiers=3, threshold=70):
+        self.num_verifiers = num_verifiers
+        self.threshold = threshold
+        
+    def reach_consensus(self, verifications):
+        scores = [v['overall_score'] for v in verifications]
+        final_score = np.median(scores)
+        status = 'approved' if final_score >= self.threshold else 'rejected'
+        return ConsensusRecord(
+            final_score=final_score,
+            status=status,
+            num_verifiers=len(verifications)
+        )
+\end{lstlisting}
+
+\subsection{Dashboard}
+
+The web dashboard provides:
+\begin{itemize}
+    \item Real-time verification status monitoring
+    \item Blockchain audit trail explorer
+    \item Compliance report generation
+    \item Interactive metric visualization
+\end{itemize}
+
+\subsection{Simulation vs Production}
+
+For development and testing, we use a simulated blockchain that maintains the same interface as Hyperledger Fabric:
+
+\begin{table}[h]
+\centering
+\caption{Simulation vs Production Mode}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Feature} & \textbf{Simulation} & \textbf{Production} \\
+\midrule
+Persistence & In-memory & Distributed ledger \\
+Consensus & Instant & PBFT (3+ nodes) \\
+Latency & $<$ 1ms & $\sim$ 100ms \\
+Tamper Resistance & No & Yes \\
+Use Case & Testing & Deployment \\
+\bottomrule
+\end{tabular}
+\end{table}
