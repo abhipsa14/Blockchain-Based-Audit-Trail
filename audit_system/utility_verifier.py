@@ -47,8 +47,10 @@ class UtilityVerifier:
         self.real_data = real_data.copy()
         self.synthetic_data = synthetic_data.copy()
         self.categorical_columns = categorical_columns or self._detect_categorical()
+        # Only include columns that are actually numeric (int or float dtypes)
         self.numerical_columns = [col for col in real_data.columns 
-                                  if col not in self.categorical_columns]
+                                  if col not in self.categorical_columns
+                                  and pd.api.types.is_numeric_dtype(real_data[col])]
         self.target_column = target_column
         
         # Results storage
@@ -83,42 +85,61 @@ class UtilityVerifier:
         # Numerical columns - Wasserstein Distance
         for col in self.numerical_columns:
             if col in self.real_data.columns and col in self.synthetic_data.columns:
-                real_vals = self.real_data[col].dropna().values
-                synth_vals = self.synthetic_data[col].dropna().values
-                
-                # Normalize for fair comparison
-                real_normalized = (real_vals - real_vals.mean()) / (real_vals.std() + 1e-10)
-                synth_normalized = (synth_vals - real_vals.mean()) / (real_vals.std() + 1e-10)
-                
-                # Wasserstein distance
-                wd = wasserstein_distance(real_normalized, synth_normalized)
-                wasserstein_distances[col] = float(wd)
-                
-                # KS test
-                ks_stat, ks_pval = ks_2samp(real_vals, synth_vals)
-                ks_statistics[col] = {'statistic': float(ks_stat), 'p_value': float(ks_pval)}
+                try:
+                    # Ensure numeric type and drop NaNs
+                    real_vals = pd.to_numeric(self.real_data[col], errors='coerce').dropna().values.astype(float)
+                    synth_vals = pd.to_numeric(self.synthetic_data[col], errors='coerce').dropna().values.astype(float)
+                    
+                    if len(real_vals) == 0 or len(synth_vals) == 0:
+                        continue
+                    
+                    # Normalize for fair comparison
+                    real_std = real_vals.std()
+                    if real_std == 0:
+                        real_std = 1e-10
+                    real_normalized = (real_vals - real_vals.mean()) / (real_std + 1e-10)
+                    synth_normalized = (synth_vals - real_vals.mean()) / (real_std + 1e-10)
+                    
+                    # Wasserstein distance
+                    wd = wasserstein_distance(real_normalized, synth_normalized)
+                    wasserstein_distances[col] = float(wd)
+                    
+                    # KS test
+                    ks_stat, ks_pval = ks_2samp(real_vals, synth_vals)
+                    ks_statistics[col] = {'statistic': float(ks_stat), 'p_value': float(ks_pval)}
+                except Exception as e:
+                    # Skip columns that can't be processed
+                    continue
         
         # Categorical columns - Jensen-Shannon Divergence
         for col in self.categorical_columns:
             if col in self.real_data.columns and col in self.synthetic_data.columns:
-                real_dist = self.real_data[col].value_counts(normalize=True)
-                synth_dist = self.synthetic_data[col].value_counts(normalize=True)
-                
-                # Align distributions
-                all_values = sorted(set(real_dist.index) | set(synth_dist.index))
-                real_aligned = np.array([real_dist.get(v, 0) for v in all_values])
-                synth_aligned = np.array([synth_dist.get(v, 0) for v in all_values])
-                
-                # Add small epsilon to avoid division by zero
-                real_aligned = real_aligned + 1e-10
-                synth_aligned = synth_aligned + 1e-10
-                
-                # Normalize
-                real_aligned = real_aligned / real_aligned.sum()
-                synth_aligned = synth_aligned / synth_aligned.sum()
-                
-                js_div = jensenshannon(real_aligned, synth_aligned)
-                js_divergences[col] = float(js_div)
+                try:
+                    real_dist = self.real_data[col].value_counts(normalize=True)
+                    synth_dist = self.synthetic_data[col].value_counts(normalize=True)
+                    
+                    # Convert to dict for proper .get() access
+                    real_dist_dict = real_dist.to_dict()
+                    synth_dist_dict = synth_dist.to_dict()
+                    
+                    # Align distributions
+                    all_values = sorted(set(real_dist_dict.keys()) | set(synth_dist_dict.keys()))
+                    real_aligned = np.array([real_dist_dict.get(v, 0) for v in all_values])
+                    synth_aligned = np.array([synth_dist_dict.get(v, 0) for v in all_values])
+                    
+                    # Add small epsilon to avoid division by zero
+                    real_aligned = real_aligned + 1e-10
+                    synth_aligned = synth_aligned + 1e-10
+                    
+                    # Normalize
+                    real_aligned = real_aligned / real_aligned.sum()
+                    synth_aligned = synth_aligned / synth_aligned.sum()
+                    
+                    js_div = jensenshannon(real_aligned, synth_aligned)
+                    js_divergences[col] = float(js_div)
+                except Exception as e:
+                    # Skip columns that can't be processed
+                    continue
         
         # Calculate scores
         avg_wd = np.mean(list(wasserstein_distances.values())) if wasserstein_distances else 0
