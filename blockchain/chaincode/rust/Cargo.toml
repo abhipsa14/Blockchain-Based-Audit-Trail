@@ -1,0 +1,27 @@
+[package]
+name = "audit_trail_chaincode"
+version = "1.0.0"
+edition = "2021"
+authors = ["Ashish Pandey"]
+description = "Hyperledger Fabric Chaincode for Synthetic Data Audit Trail"
+license = "Apache-2.0"
+
+[lib]
+name = "audit_trail"
+crate-type = ["cdylib"]
+
+[dependencies]
+# Fabric Contract SDK
+fabric-contract-api = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+sha2 = "0.10"
+hex = "0.4"
+thiserror = "1.0"
+log = "0.4"
+env_logger = "0.10"
+
+[profile.release]
+opt-level = 3
+lto = true

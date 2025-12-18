@@ -1,0 +1,55 @@
+# Crypto Config for Hyperledger Fabric Network
+# crypto-config.yaml for Synthetic Data Audit Trail Network
+
+################################################################################
+#   Orderer Organizations
+################################################################################
+OrdererOrgs:
+  - Name: Orderer
+    Domain: audit.com
+    EnableNodeOUs: true
+    Specs:
+      - Hostname: orderer
+        SANS:
+          - localhost
+          - 127.0.0.1
+
+################################################################################
+#   Peer Organizations
+################################################################################
+PeerOrgs:
+  # Hospital Organization - Data Generator
+  - Name: Hospital
+    Domain: hospital.audit.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - 127.0.0.1
+    Users:
+      Count: 2
+
+  # Regulator Organization - Compliance Verifier
+  - Name: Regulator
+    Domain: regulator.audit.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - 127.0.0.1
+    Users:
+      Count: 2
+
+  # Research Organization - Data Consumer/Verifier
+  - Name: Research
+    Domain: research.audit.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - 127.0.0.1
+    Users:
+      Count: 2
