@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 import os
 import sys
+import pickle
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -348,6 +349,88 @@ class AuditableCTGAN:
                 for log in self.audit_logs
             ]
         }
+
+    def save(self, filepath: str) -> None:
+        """
+        Save the trained model to a file.
+        
+        Args:
+            filepath: Path to save the model
+        """
+        if not self.is_fitted:
+            raise RuntimeError("Model must be fitted before saving")
+        
+        # Save CTGAN model separately using its native method
+        model_path = filepath.replace('.pkl', '_ctgan.pkl')
+        if self.model is not None:
+            self.model.save(model_path)
+        
+        # Save metadata separately
+        metadata = {
+            'epochs': self.epochs,
+            'batch_size': self.batch_size,
+            'generator_dim': self.generator_dim,
+            'discriminator_dim': self.discriminator_dim,
+            'is_fitted': self.is_fitted,
+            'training_data_hash': self.training_data_hash,
+            'categorical_columns': self.categorical_columns,
+            'columns': self.columns,
+            'training_start_time': self.training_start_time,
+            'training_end_time': self.training_end_time,
+            'audit_logs': [log.to_dict() if hasattr(log, 'to_dict') else log for log in self.audit_logs],
+            'ctgan_model_path': model_path
+        }
+        
+        with open(filepath, 'wb') as f:
+            pickle.dump(metadata, f)
+        
+        if self.verbose:
+            print(f"Model saved to {filepath}")
+    
+    @classmethod
+    def load(cls, filepath: str, verbose: bool = True) -> 'AuditableCTGAN':
+        """
+        Load a trained model from a file.
+        
+        Args:
+            filepath: Path to the saved model
+            verbose: Whether to print progress
+            
+        Returns:
+            Loaded AuditableCTGAN instance
+        """
+        with open(filepath, 'rb') as f:
+            metadata = pickle.load(f)
+        
+        # Validate that loaded data is a dictionary
+        if not isinstance(metadata, dict):
+            raise ValueError(f"Invalid cache file format. Expected dict, got {type(metadata).__name__}. Delete the cache file and retrain.")
+        
+        instance = cls(
+            epochs=metadata['epochs'],
+            batch_size=metadata['batch_size'],
+            generator_dim=metadata['generator_dim'],
+            discriminator_dim=metadata['discriminator_dim'],
+            verbose=verbose
+        )
+        
+        instance.is_fitted = metadata['is_fitted']
+        instance.training_data_hash = metadata['training_data_hash']
+        instance.categorical_columns = metadata['categorical_columns']
+        instance.columns = metadata['columns']
+        instance.training_start_time = metadata['training_start_time']
+        instance.training_end_time = metadata['training_end_time']
+        instance.audit_logs = metadata['audit_logs']
+        
+        # Load CTGAN model using its native method
+        ctgan_path = metadata.get('ctgan_model_path', filepath.replace('.pkl', '_ctgan.pkl'))
+        if CTGAN_AVAILABLE and os.path.exists(ctgan_path):
+            instance.model = CTGAN.load(ctgan_path)
+        
+        if verbose:
+            print(f"Model loaded from {filepath}")
+        
+        return instance
 
 
 # Convenience function
