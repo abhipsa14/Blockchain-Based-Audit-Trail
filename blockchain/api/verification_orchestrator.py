@@ -20,7 +20,7 @@ from audit_system.privacy_verifier import PrivacyVerifier
 from audit_system.utility_verifier import UtilityVerifier
 from audit_system.bias_detector import BiasDetector
 from audit_system.consensus_engine import ConsensusEngine, VerificationStatus
-from blockchain.api.blockchain_client import BlockchainClient, compute_data_hash
+from blockchain.api.blockchain_client import BlockchainClient, BlockchainMode, compute_data_hash
 
 
 @dataclass
@@ -63,14 +63,14 @@ class VerificationOrchestrator:
     
     def __init__(self, min_verifiers: int = 3, 
                  approval_threshold: float = 70.0,
-                 blockchain_mode: str = "simulation"):
+                 blockchain_mode: BlockchainMode = BlockchainMode.SIMULATION):
         """
         Initialize the orchestrator.
         
         Args:
             min_verifiers: Minimum verifiers for consensus
             approval_threshold: Score threshold for approval
-            blockchain_mode: Blockchain backend mode
+            blockchain_mode: Blockchain backend mode (BlockchainMode enum)
         """
         self.consensus_engine = ConsensusEngine(
             min_verifiers=min_verifiers,
