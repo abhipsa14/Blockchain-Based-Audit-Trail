@@ -294,15 +294,27 @@ class VerificationOrchestrator:
             Final consensus result
         """
         results = []
+        final_consensus = None
         
         for i in range(num_verifiers):
             verifier_id = f"verifier_{i}"
             result = self.run_verification(request_id, verifier_id)
             results.append(result)
+
+            # Capture consensus as soon as it is available.
+            consensus = result.get('consensus') if isinstance(result, dict) else None
+            if isinstance(consensus, dict) and consensus.get('consensus_reached'):
+                final_consensus = consensus
+                break
         
-        # Get final consensus
-        if results and 'consensus' in results[-1]:
-            return results[-1]['consensus']
+        # Return captured consensus if reached.
+        if final_consensus is not None:
+            return final_consensus
+
+        # Fallback: if any iteration returned a consensus-like object, return the latest one.
+        for r in reversed(results):
+            if isinstance(r, dict) and 'consensus' in r and isinstance(r['consensus'], dict):
+                return r['consensus']
         
         return {'error': 'Verification failed', 'individual_results': results}
     

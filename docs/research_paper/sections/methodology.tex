@@ -1,114 +1,174 @@
-% Methodology Section
+% Proposed System and Implementation
 
-\subsection{System Overview}
+\subsection{Architecture Overview}
 
-We propose a two-layer architecture that separates verification logic from audit trail security:
+Fig.~\ref{fig:architecture} illustrates the complete pipeline. Tier~1, the \emph{Verification Engine}, accepts a real table $R$ and its synthetic counterpart $S$, fingerprints both via SHA-256, and scores $S$ along three independent axes---privacy, utility, and fairness. Tier~2, the \emph{Blockchain Audit Layer}, collects axis scores from $n$ independent examiners, fuses them through a median-based consensus protocol, runs a compliance engine that maps the measured scores to specific articles in GDPR, HIPAA, and the EU AI Act, and writes the entire result to both a local hash-chain log and a Hyperledger Fabric ledger. The output is a signed audit certificate that any third party can verify.
 
-\begin{itemize}
-    \item \textbf{Layer 1 (Verification System):} Validates synthetic data quality through objective metrics
-    \item \textbf{Layer 2 (Blockchain):} Secures the verification results in an immutable, distributed ledger
-\end{itemize}
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    node distance=0.32cm,
+    box/.style={rectangle, draw, rounded corners=2pt, minimum height=0.42cm, align=center, font=\scriptsize, inner sep=3pt},
+    tier/.style={rectangle, draw=gray!50, dashed, inner sep=0.1cm, rounded corners=3pt},
+    arr/.style={-{Stealth[length=1.5mm]}, thick, gray!70}
+]
+\node[box, fill=green!8] (inp) {Real Table $R$ \;+\; Synthetic Table $S$};
+\node[box, fill=gray!8, below=of inp] (sha) {SHA-256 Fingerprint};
+\node[box, fill=blue!10, below left=0.4cm and 0.9cm of sha] (priv) {Privacy\\(4 metrics)};
+\node[box, fill=blue!10, below=0.4cm of sha] (util) {Utility\\(3 metrics)};
+\node[box, fill=blue!10, below right=0.4cm and 0.9cm of sha] (fair) {Fairness\\(4 metrics)};
+\node[tier, fit=(priv)(util)(fair), label={[font=\tiny\bfseries, fill=white, inner sep=1pt]above:Tier 1: Verification Engine}] {};
+\node[box, fill=yellow!10, below=0.65cm of util, minimum width=3.8cm] (exam) {$n$ Independent Examiners};
+\node[box, fill=yellow!18, below=of exam, minimum width=3.8cm] (cons) {Median Consensus};
+\node[box, fill=purple!8, below=of cons, minimum width=3.8cm] (comp) {Compliance Engine};
+\node[box, fill=orange!10, below left=0.35cm and 0.15cm of comp] (hc) {Hash Chain};
+\node[box, fill=orange!10, below right=0.35cm and 0.15cm of comp] (fab) {Fabric Ledger};
+\node[tier, fit=(exam)(cons)(comp)(hc)(fab), label={[font=\tiny\bfseries, fill=white, inner sep=1pt]above:Tier 2: Blockchain Audit Layer}] {};
+\node[box, fill=red!6, below=0.4cm of $(hc)!0.5!(fab)$] (cert) {Audit Certificate};
+\draw[arr] (inp)--(sha);
+\draw[arr] (sha)--(priv); \draw[arr] (sha)--(util); \draw[arr] (sha)--(fair);
+\draw[arr] (priv.south) |- ([yshift=0.1cm]exam.north west);
+\draw[arr] (util)--(exam);
+\draw[arr] (fair.south) |- ([yshift=0.1cm]exam.north east);
+\draw[arr] (exam)--(cons); \draw[arr] (cons)--(comp);
+\draw[arr] (comp) -| (hc); \draw[arr] (comp) -| (fab);
+\draw[arr] (hc.south) |- (cert.west);
+\draw[arr] (fab.south) |- (cert.east);
+\end{tikzpicture}
+\caption{Two-tier system architecture. Tier~1 evaluates the synthetic table along three quality axes. Tier~2 aggregates examiner verdicts, checks regulatory compliance, and writes the final record to a dual tamper-proof store (local hash chain and Fabric ledger).}
+\label{fig:architecture}
+\end{figure}
 
-\subsection{Layer 1: Verification System}
+\subsection{Threat Model and Integrity Guarantees}
 
-\subsubsection{Privacy Verification}
-The privacy module evaluates four key metrics:
-
-\textbf{1. Distance to Closest Record (DCR):}
+We consider four concrete attack vectors: (A1)~post-verification tampering with the synthetic data, (A2)~score falsification by a rogue examiner, (A3)~coordinated collusion among up to $f$ of $n$ examiners, and (A4)~retroactive editing of audit logs. Integrity against A1 and A4 is ensured through SHA-256 hash chaining:
 \begin{equation}
-DCR(s) = \min_{r \in R} d(s, r)
+H_i = \mathrm{SHA\text{-}256}\!\bigl(\mathit{payload}_i \;\|\; H_{i-1}\bigr)
+\label{eq:hash_chain}
 \end{equation}
-where $s$ is a synthetic record, $R$ is the set of real records, and $d$ is a distance function (Euclidean for numerical, Hamming for categorical).
+where altering any single entry invalidates every subsequent hash. The \texttt{AuditLogger} module implements this chain across twelve event types, independently of the Fabric network. Against A2 and A3, the median-based consensus function provides Byzantine fault tolerance for $f \le \lfloor(n{-}1)/2\rfloor$ corrupt participants~\cite{lamport1982byzantine}. A variance guard ($\mathrm{Var}>400$) on the per-examiner overall scores additionally flags high-disagreement rounds as \textsc{disputed}, triggering manual review.
 
-\textbf{2. k-Anonymity:}
-For quasi-identifier columns $Q$, we verify:
+\subsection{Tier~1: Verification Metrics}
+
+\subsubsection{Privacy module (\texttt{PrivacyVerifier})}
+Four metrics probe distinct re-identification pathways.
+
+\textbf{Distance to closest record (DCR).} For each synthetic row $s$, we compute $\mathrm{DCR}(s)=\min_{r\in R} d(s,r)$ after z-score normalisation. A mean DCR near zero signals memorisation. The implementation samples up to 1\thinspace000 rows from each table, normalises feature-wise, and uses Euclidean distance via SciPy's \texttt{cdist}.
+
+\textbf{Quasi-identifier grouping ($k$-anonymity~\cite{sweeney2002k}).} Every combination of quasi-identifier columns must appear in at least $k{=}5$ synthetic rows, consistent with HIPAA Safe Harbour. The score equals the fraction of groups meeting this bar.
+
+\textbf{Membership-inference resilience.} A random-forest classifier trained on a balanced 50/50 real--synthetic mix~\cite{shokri2017membership} should achieve accuracy near 0.5 (pure guessing). We convert to a score: $S_{\mathrm{MIA}}=\max\!\bigl(0,\;100-|a-0.5|\times200\bigr)$.
+
+\textbf{Attribute-disclosure risk.} Total-variation distance between the conditional distributions of sensitive columns in $R$ and $S$ quantifies how much fine-grained attribute structure leaks through generation.
+
+The four sub-scores are combined as:
 \begin{equation}
-\forall q \in Q: |S_q| \geq k
+S_{\mathrm{priv}} = 0.3\,S_{\mathrm{DCR}} + 0.2\,S_k + 0.3\,S_{\mathrm{MIA}} + 0.2\,S_{\mathrm{disc}}
+\label{eq:privacy_score}
 \end{equation}
-where $S_q$ is the set of records sharing quasi-identifier values $q$.
 
-\textbf{3. Membership Inference Attack (MIA):}
-We train a binary classifier to distinguish real from synthetic records:
+\subsubsection{Utility module (\texttt{UtilityVerifier})}
+Three checks capture statistical and downstream fidelity.
+
+\textbf{Distributional similarity.} Wasserstein-1 distance for numerical columns; Jensen--Shannon divergence for categorical ones. The Kolmogorov--Smirnov test supplements both as a significance check.
+
+\textbf{Correlation preservation.} Mean absolute element-wise difference between the Pearson correlation matrices of $R$ and $S$, computed after label-encoding categorical columns.
+
+\textbf{Downstream ML fidelity (TSTR).} A random forest is trained on $S$ and evaluated on a held-out 30\% of $R$. The efficacy ratio $\mathrm{ML}_{\mathrm{eff}}=\mathrm{Acc}_{\mathrm{TSTR}}/\mathrm{Acc}_{\mathrm{TRTR}}$ captures how much downstream accuracy is retained.
+
+Composite:
 \begin{equation}
-MIA_{acc} = \frac{TP + TN}{TP + TN + FP + FN}
+S_{\mathrm{util}} = 0.4\,S_{\mathrm{stat}} + 0.3\,S_{\mathrm{corr}} + 0.3\,S_{\mathrm{ML}}
+\label{eq:utility_score}
 \end{equation}
-Privacy is preserved if $MIA_{acc} \approx 0.5$ (random guessing).
 
-\textbf{4. Attribute Disclosure Risk:}
-Measures similarity in sensitive attribute distributions using Total Variation distance.
+\subsubsection{Fairness module (\texttt{BiasDetector})}
+Four fairness metrics are evaluated across every auto-detected protected attribute (e.g.\ \texttt{sex}, \texttt{race}, \texttt{age}):
 
-\subsubsection{Utility Verification}
-The utility module measures data usefulness:
+\textbf{Demographic parity}~---~maximum difference in group proportions between real and synthetic data.
+\textbf{Disparate impact}~\cite{feldman2015certifying}~---~four-fifths rule ratio across demographic groups.
+\textbf{Equal opportunity difference}~\cite{hardt2016equality}~---~gap in true-positive rates.
+\textbf{Statistical parity difference}~---~gap in favourable-outcome rates.
 
-\textbf{1. Statistical Similarity:}
-Using Wasserstein distance (Earth Mover's Distance):
+Each metric is weighted equally:
 \begin{equation}
-W_p(P_r, P_s) = \left( \inf_{\gamma \in \Gamma(P_r, P_s)} \int |x-y|^p d\gamma(x,y) \right)^{1/p}
+S_{\mathrm{fair}} = 0.25\,(S_{\mathrm{DP}} + S_{\mathrm{DI}} + S_{\mathrm{EOD}} + S_{\mathrm{SPD}})
+\label{eq:fairness_score}
 \end{equation}
 
-\textbf{2. Correlation Preservation:}
-\begin{equation}
-\Delta_{corr} = \frac{1}{n^2} \sum_{i,j} |corr_r(i,j) - corr_s(i,j)|
-\end{equation}
+When any fairness sub-score falls below threshold, a dedicated \texttt{FairnessPostprocessor} module applies group rebalancing, disparate-impact correction, or selection-rate alignment, building on the optimised pre-processing approach of Calmon et al.~\cite{calmon2017optimized}.
 
-\textbf{3. ML Efficacy (TSTR):}
-Train on Synthetic, Test on Real accuracy compared to Train on Real, Test on Real:
-\begin{equation}
-ML_{efficacy} = \frac{Acc_{TSTR}}{Acc_{TRTR}}
-\end{equation}
+Fig.~\ref{fig:metric_tree} visualises the full scoring hierarchy with inner sub-metric weights and outer axis weights.
 
-\subsubsection{Bias Detection}
-The fairness module evaluates:
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    grow=down,
+    level 1/.style={sibling distance=2.6cm, level distance=0.9cm},
+    level 2/.style={sibling distance=0.7cm, level distance=0.85cm},
+    root/.style={rectangle, draw, fill=blue!12, rounded corners=2pt, font=\scriptsize\bfseries, inner sep=3pt},
+    mid/.style={rectangle, draw, fill=yellow!12, rounded corners=2pt, font=\tiny, inner sep=2pt, align=center},
+    leaf/.style={rectangle, draw, fill=gray!8, rounded corners=1pt, font=\tiny, inner sep=2pt, align=center},
+    edge from parent/.style={draw, -{Stealth[length=1mm]}, thin}
+]
+\node[root] {Trust Score}
+    child { node[mid] {Privacy\\(0.40)}
+        child { node[leaf] {DCR\\0.3} }
+        child { node[leaf] {$k$-an\\0.2} }
+        child { node[leaf] {MIA\\0.3} }
+        child { node[leaf] {Disc\\0.2} }
+    }
+    child { node[mid] {Utility\\(0.35)}
+        child { node[leaf] {Stat\\0.4} }
+        child { node[leaf] {Corr\\0.3} }
+        child { node[leaf] {ML\\0.3} }
+    }
+    child { node[mid] {Fairness\\(0.25)}
+        child { node[leaf] {DP\\0.25} }
+        child { node[leaf] {DI\\0.25} }
+        child { node[leaf] {EOD\\0.25} }
+        child { node[leaf] {SPD\\0.25} }
+    };
+\end{tikzpicture}
+\caption{Hierarchical metric decomposition. Outer weights (0.40, 0.35, 0.25) compose the trust score from three axes; inner weights compose each axis score via Eqs.~\ref{eq:privacy_score}--\ref{eq:fairness_score}.}
+\label{fig:metric_tree}
+\end{figure}
 
-\textbf{1. Demographic Parity:}
-\begin{equation}
-DP = |P(\hat{Y}=1|A=0) - P(\hat{Y}=1|A=1)|
-\end{equation}
-where $A$ is the protected attribute.
+\subsection{Tier~2: Consensus Protocol and Ledger Integration}
 
-\textbf{2. Disparate Impact:}
-\begin{equation}
-DI = \frac{P(\hat{Y}=1|A=0)}{P(\hat{Y}=1|A=1)}
-\end{equation}
-Acceptable range: $[0.8, 1.25]$ (80\% rule).
+Algorithm~\ref{alg:consensus} describes the aggregation step implemented in the \texttt{ConsensusEngine} class. Each of $n$ examiners independently submits a triple of per-axis scores. The engine takes the coordinate-wise median of each axis, computes a weighted overall score, and classifies the verdict.
 
-\subsection{Layer 2: Blockchain Consensus}
-
-\subsubsection{Consensus Algorithm}
-We implement a weighted median consensus:
-
-\begin{algorithm}
-\caption{Verification Consensus}
+\begin{algorithm}[h]
+\caption{Median-based verification consensus.}
+\label{alg:consensus}
 \begin{algorithmic}[1]
-\REQUIRE Verification results $V = \{v_1, ..., v_n\}$ from $n$ verifiers
+\REQUIRE Score triples $V=\{v_1,\dots,v_n\}$; threshold $\theta=70$; max variance $\sigma^2_{\max}=400$
 \ENSURE Consensus record $C$
-\FOR{each metric $m$ in \{privacy, utility, bias\}}
-    \STATE $scores_m \leftarrow [v_i.m \text{ for } v_i \in V]$
-    \STATE $C.m \leftarrow median(scores_m)$
+\FOR{each axis $m \in \{\text{priv.}, \text{util.}, \text{fair.}\}$}
+    \STATE $C.m \leftarrow \text{median}([v_i.m])$
 \ENDFOR
-\STATE $C.overall \leftarrow \frac{C.privacy + C.utility + C.bias}{3}$
-\IF{$C.overall \geq threshold$}
-    \STATE $C.status \leftarrow APPROVED$
+\STATE $C.\text{overall} \leftarrow 0.40\,C.\text{priv.} + 0.35\,C.\text{util.} + 0.25\,C.\text{fair.}$
+\IF{$\text{Var}([v_i.\text{overall}]) > \sigma^2_{\max}$}
+    \STATE $C.\text{verdict} \leftarrow \textsc{disputed}$
+\ELSIF{$C.\text{overall} \ge \theta$}
+    \STATE $C.\text{verdict} \leftarrow \textsc{approved}$
 \ELSE
-    \STATE $C.status \leftarrow REJECTED$
+    \STATE $C.\text{verdict} \leftarrow \textsc{rejected}$
 \ENDIF
 \RETURN $C$
 \end{algorithmic}
 \end{algorithm}
 
-\subsubsection{Smart Contract Functions}
-The blockchain layer implements three core functions:
-\begin{itemize}
-    \item \texttt{SubmitVerification}: Individual verifiers submit results
-    \item \texttt{QueryConsensus}: Retrieve aggregated verification results
-    \item \texttt{VerifyIntegrity}: Auditors verify data hasn't been tampered
-\end{itemize}
+The median is preferred over the mean because it remains faithful even when up to $\lfloor(n{-}1)/2\rfloor$ input values are arbitrarily corrupted---precisely the property required for Byzantine tolerance~\cite{lamport1982byzantine}. Each examiner's submission is signed with an HMAC-style hash that binds the verifier identity, score, and timestamp, providing non-repudiation.
 
-\subsection{Regulatory Compliance}
+The \texttt{BlockchainClient} module abstracts two backends behind a common API: a full Hyperledger Fabric~2.5~\cite{androulaki2018hyperledger} deployment (Docker containers running Raft ordering for development and PBFT~\cite{castro1999practical} for production) and a lightweight in-process simulated blockchain that mirrors the Fabric API surface. The simulated mode enables reproducible benchmarks without a live network. In both modes, each event---data generation, verification submission, consensus outcome, and compliance check---is logged as a separate blockchain transaction.
 
-The system automatically checks compliance with:
-\begin{itemize}
-    \item \textbf{GDPR Article 25:} Privacy by design verification
-    \item \textbf{EU AI Act:} Bias detection and documentation
-    \item \textbf{HIPAA:} De-identification verification (k-anonymity $\geq 5$)
-\end{itemize}
+\subsection{Compliance Engine}
+
+The \texttt{ComplianceChecker} module maps measured scores to fifteen specific clauses drawn from three regulations. Five GDPR articles are checked (Art.~5(1)(c) on data minimisation, Art.~5(1)(d) on accuracy, Art.~25 on privacy by design, Art.~35 on data protection impact assessment, and Art.~5(2) on accountability). Five HIPAA sections are evaluated (\S164.514(a) de-identification, \S164.514(b)(1) expert determination, \S164.514(b)(2) Safe Harbour, \S164.312(b) audit controls, and \S164.530(j) documentation). Five EU AI Act articles cover data quality (Art.~10), transparency (Art.~13), risk management (Art.~9), technical documentation (Art.~11), and human oversight (Art.~14). For example, GDPR Art.~25 passes only when $S_{\mathrm{priv}} \ge 70$ and the audit log contains at least one privacy-verification entry.
+
+\subsection{Implementation Summary}
+
+The entire framework is realised in roughly 8\thinspace500 lines of Python~3.10, structured as a highly cohesive, modular integration of machine learning and cryptographic auditing pipelines. The core generation logic is driven by \texttt{AuditableCTGAN}, a specialised wrapper around the SDV pipeline that injects continuous SHA-256 state tracking for both input and synthesised datasets. The three-axis evaluation is handled by dedicated, fully decoupled modules: \texttt{PrivacyVerifier}, \texttt{UtilityVerifier}, and \texttt{BiasDetector}, which leverage scikit-learn and SciPy to process vectorised evaluations efficiently.
+
+The distributed decision-making is orchestrated by the \texttt{ConsensusEngine}, which handles the Byzantine-tolerant aggregation logic, while the \texttt{AuditLogger} guarantees local chronological integrity by maintaining an independent application-layer hash chain. Finally, the \texttt{ComplianceChecker} executes the regulatory score mapping. The entire lifecycle---from initial data loading and CTGAN execution to verification consensus and ledger commit---is fully automated via the \texttt{VerificationPipeline} controller. The external ledger environment leverages Hyperledger Fabric 2.5 with underlying smart contracts deployed in Go and Rust across a multi-tiered corporate network (designated for Hospital, Regulator, and Research nodes), interfaced via a dedicated \texttt{auditchannel}. A lightweight, Flask-powered local dashboard facilitates realtime operational oversight and human-in-the-loop validation tasks.

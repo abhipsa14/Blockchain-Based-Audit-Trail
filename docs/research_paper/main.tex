@@ -1,6 +1,7 @@
 \documentclass[conference]{IEEEtran}
 \usepackage{graphicx}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{algorithm}
 \usepackage{algorithmic}
 \usepackage{hyperref}
@@ -8,26 +9,54 @@
 \usepackage{multirow}
 \usepackage{xcolor}
 \usepackage{listings}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{balance}
+
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, calc, patterns}
+\pgfplotsset{compat=1.18}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  stringstyle=\color{red},
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  xleftmargin=2em,
+  framexleftmargin=1.5em
+}
 
 \title{Blockchain-Based Audit Trails for Verifiable and Trustworthy Synthetic Data Generation}
-
-\author{
-\IEEEauthorblockN{Ashish Pandey}
-\IEEEauthorblockA{Department of Computer Science\\
-Institution Name\\
-Email: ashish.pandey@email.com}
+\author{%
+  \resizebox{\textwidth}{!}{%
+    \begin{tabular}{cccc}
+      \textbf{Abhipsa Srivastava} & \textbf{Atul Maurya} & \textbf{Abhishek Malviya} & \textbf{Harshit Mishra} \\[2pt]
+      United Institute of Technology & United Institute of Technology & United Institute of Technology & United Institute of Technology \\[2pt]
+      Prayagraj, India & Prayagraj, India & Prayagraj, India & Prayagraj, India \\[2pt]
+      \texttt{abhipsasri8183@gmail.com} & \texttt{atulmaurya1804@gmail.com} & \texttt{abhishekmalviya@united.ac.in} & \texttt{harshit707125@gmail.com}
+    \end{tabular}%
+  }%
 }
+
 
 \begin{document}
 
 \maketitle
-
 \begin{abstract}
-Synthetic data generation has emerged as a promising solution for addressing data scarcity and privacy concerns in machine learning applications. However, trusting the quality and privacy guarantees of synthetic data remains challenging, as traditional approaches rely on centralized verification that is susceptible to tampering and lacks transparency. This paper presents a novel blockchain-based framework that integrates comprehensive verification mechanisms with immutable audit trails to establish trustworthy synthetic data generation. Our two-layer architecture combines Layer 1 (verification system) that validates privacy metrics, utility metrics, and bias detection with Layer 2 (blockchain) that secures the audit trail through distributed consensus. We implement the system using Hyperledger Fabric and evaluate it against baseline and centralized approaches. Experimental results on the Adult Income dataset demonstrate that our approach achieves comparable verification accuracy while providing tamper-resistant audit trails and consensus-based trust establishment. The system successfully detects low-quality synthetic datasets with 95\% accuracy while maintaining verification latency under 10 seconds for datasets up to 100K rows.
+Verifying synthetic data quality in privacy-regulated environments presents a fundamental challenge: traditional evaluation methods require direct access to real data, which is precisely what regulations like GDPR and HIPAA prohibit. We present a two-layer framework that decouples verification from real-data access while producing tamper-evident, publicly auditable quality certificates.
+The verification layer evaluates synthetic datasets across three dimensions without exposing source records: privacy (Distance to Closest Record, k-anonymity, and membership inference attack resistance), utility (Wasserstein distributional distance and train-on-synthetic/test-on-real ML accuracy degradation capped at 10\%), and fairness (demographic parity gap below 5\%). Multiple independent verifiers run this protocol concurrently, and their scores are aggregated via median consensus --- a choice that provides Byzantine fault tolerance for up to $\lfloor(n-1)/2\rfloor$ dishonest participants.
+The blockchain layer records each verification event as an immutable transaction on Hyperledger Fabric, storing cryptographic hashes, metric summaries, and consensus proofs on-chain while keeping raw datasets off-chain in IPFS. A secondary application-level hash chain guards local logs during network unavailability. A compliance engine then maps measured scores to specific articles in GDPR, HIPAA, and the EU AI Act.
+Evaluated on the UCI Adult Income benchmark (48K samples), the framework achieves 88\% agreement with full-access baselines and completes end-to-end verification --- including CTGAN generation, privacy checks, consensus, and blockchain commit --- in under 40 seconds for 10,000-row datasets. Ablation confirms each verification component contributes measurably to the composite trust score.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Blockchain, Synthetic Data, Privacy, Audit Trail, CTGAN, Differential Privacy, Hyperledger Fabric
+Blockchain, Synthetic Data, Privacy, Audit Trail, CTGAN, Fairness, Hyperledger Fabric, Verification
 \end{IEEEkeywords}
 
 \section{Introduction}
@@ -36,24 +65,16 @@ Blockchain, Synthetic Data, Privacy, Audit Trail, CTGAN, Differential Privacy, H
 \section{Related Work}
 \input{sections/related_work}
 
-\section{Proposed System}
+\section{Proposed System and Implementation}
 \input{sections/methodology}
 
-\section{Implementation}
-\input{sections/implementation}
-
-\section{Experimental Evaluation}
-\input{sections/experiments}
-
-\section{Results and Discussion}
+\section{Experiments and Results}
 \input{sections/results}
 
-\section{Conclusion and Future Work}
+\section{Conclusion}
 \input{sections/conclusion}
 
-\section*{Acknowledgments}
-The authors thank the open-source community for providing tools like CTGAN and Hyperledger Fabric that made this research possible.
-
+\balance
 \bibliographystyle{IEEEtran}
 \bibliography{references}
 

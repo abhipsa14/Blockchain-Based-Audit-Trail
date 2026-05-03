@@ -45,7 +45,24 @@ class PrivacyVerifier:
         self.real_data = real_data.copy()
         self.synthetic_data = synthetic_data.copy()
         self.sensitive_columns = sensitive_columns or []
-        self.quasi_identifiers = quasi_identifiers or list(real_data.columns)
+
+        # Use practical defaults for quasi-identifiers instead of all columns.
+        # Grouping by every column (especially high-cardinality numeric columns)
+        # can be both computationally expensive and not meaningful for k-anonymity.
+        if quasi_identifiers:
+            self.quasi_identifiers = quasi_identifiers
+        else:
+            detected_qi = []
+            for col in real_data.columns:
+                series = real_data[col]
+                unique_count = series.nunique(dropna=True)
+                if (series.dtype == 'object' or
+                    series.dtype.name == 'category' or
+                    unique_count <= 50):
+                    detected_qi.append(col)
+
+            # Keep a bounded set to avoid combinatorial explosion.
+            self.quasi_identifiers = detected_qi[:6] if detected_qi else list(real_data.columns[:4])
         
         # Encode categorical columns for distance calculations
         self.label_encoders = {}
@@ -146,8 +163,9 @@ class PrivacyVerifier:
         if not qi_cols:
             return {'error': 'No valid quasi-identifiers found'}
         
-        # Group by quasi-identifiers
-        groups = self.synthetic_data.groupby(qi_cols).size()
+        # Group by quasi-identifiers. observed=True avoids creating full
+        # cartesian products for categorical columns, preventing memory blowups.
+        groups = self.synthetic_data.groupby(qi_cols, observed=True).size()
         
         # Calculate k values
         k_values = groups.values

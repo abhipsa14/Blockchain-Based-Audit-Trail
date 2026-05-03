@@ -1,65 +1,7 @@
-% Conclusion Section
+% Conclusion
 
-\subsection{Summary}
+This paper addressed a practical trust problem that organisations face when generating synthetic data under regulatory constraints: how can a data consumer prove, with cryptographic certainty, that a synthetic table maintains statistical utility, protects individual privacy, and treats demographic groups fairly? We proposed a two-tier system that separates objective, multi-metric quality testing from a tamper-proof recording process hosted on a Hyperledger Fabric ledger.
 
-This paper presented a blockchain-based framework for establishing trust in synthetic data generation. Our two-layer architecture addresses the oracle problem by combining objective verification metrics (Layer 1) with immutable audit trails (Layer 2). Key contributions include:
+Our experiments on the UCI Adult Income benchmark produced several clear outcomes. First, distributing the verification process across three independent examiners and storing the consensus result on a blockchain raised the composite trust rating by 43\% compared to a single-examiner baseline, adding only 2.4 seconds to the pipeline. Second, our ablation studies showed that every sub-metric in the eleven-metric suite provided a measurable benefit. The membership-inference test provided the largest privacy gain ($\Delta{=}3.3$), and statistical similarity provided the largest utility gain ($\Delta{=}3.8$). Third, running the data through the fairness post-processor increased fairness scores by 17.4 points using group rebalancing and selection-rate alignment, although fairness remained the hardest axis to perfect when generating data from the Adult dataset. Fourth, the compliance engine accurately mapped the objective scores to fifteen specific articles across GDPR, HIPAA, and the EU AI Act, reaching an overall compliance rate of 86.7\%. Finally, the system scales sub-linearly with data size, taking 12 seconds to process a 50,000-row table and under 23 seconds for 100,000 rows.
 
-\begin{enumerate}
-    \item A comprehensive verification system covering privacy, utility, and fairness metrics
-    \item Consensus-based trust establishment using multiple independent verifiers
-    \item Integration with Hyperledger Fabric for enterprise-grade audit trails
-    \item Experimental validation showing 43\% higher trust scores with acceptable latency overhead
-\end{enumerate}
-
-\subsection{Key Findings}
-
-Our experiments demonstrated that:
-\begin{itemize}
-    \item Blockchain-based verification provides stronger trust guarantees than centralized approaches while maintaining comparable verification accuracy
-    \item The system scales linearly with dataset size, achieving sub-10-second verification for datasets up to 50K rows
-    \item Consensus mechanisms effectively filter Byzantine verifiers when fewer than 1/3 are compromised
-    \item The framework successfully integrates GDPR, HIPAA, and EU AI Act compliance checking
-\end{itemize}
-
-\subsection{Practical Implications}
-
-For practitioners, our system enables:
-\begin{itemize}
-    \item \textbf{Healthcare:} Trustworthy synthetic patient data for research
-    \item \textbf{Finance:} Auditable synthetic data for model development
-    \item \textbf{Government:} Compliant data sharing across agencies
-    \item \textbf{AI Development:} Transparent training data provenance
-\end{itemize}
-
-\subsection{Future Work}
-
-Several directions merit further investigation:
-
-\subsubsection{Technical Extensions}
-\begin{itemize}
-    \item \textbf{Zero-Knowledge Proofs:} Verify data quality without revealing raw metrics
-    \item \textbf{Federated Verification:} Distribute verification across data owners
-    \item \textbf{Bias Mitigation:} Integrate fairness constraints during generation
-\end{itemize}
-
-\subsubsection{Generator Extensions}
-\begin{itemize}
-    \item \textbf{VAE Integration:} Add Variational Autoencoder generators
-    \item \textbf{Diffusion Models:} Incorporate recent advances in generative modeling
-    \item \textbf{Domain-Specific Generators:} Specialized models for healthcare, finance
-\end{itemize}
-
-\subsubsection{Deployment}
-\begin{itemize}
-    \item \textbf{Production Hyperledger Fabric:} Full multi-organization deployment
-    \item \textbf{Cross-Chain Interoperability:} Bridge to other blockchain platforms
-    \item \textbf{SaaS Platform:} Cloud-hosted verification service
-\end{itemize}
-
-\subsection{Conclusion}
-
-Trust in synthetic data is fundamental to its adoption in high-stakes applications. By bridging the gap between data quality verification and blockchain immutability, our framework provides a practical solution for establishing verifiable trust in synthetic data generation. The open-source implementation enables researchers and practitioners to build upon this foundation for domain-specific applications.
-
-\subsection*{Code Availability}
-
-The complete implementation is available at: \url{https://github.com/[repository-link]}
+We identify several areas for future research. Zero-knowledge proofs could allow examiners to prove a quality check passed without revealing the underlying raw score, which would further strengthen privacy between separate organisations. Building differential-privacy guarantees~\cite{dwork2006differential} directly into the CTGAN algorithm would establish a theoretical privacy baseline underneath our empirical measurements. Using federated verification~\cite{bonawitz2017practical}, where data owners run local checks and only share aggregated decisions, would remove the need to send real records to a central verification node. Transitioning from hand-tuned score weights to weights learned directly from domain-specific datasets would allow the framework to adapt automatically to new deployment environments. Finally, expanding the metrics suite to handle time-series and sequential patterns would make the system useful for applications beyond standard tabular data.

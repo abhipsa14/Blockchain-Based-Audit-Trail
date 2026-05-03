@@ -12,6 +12,7 @@ from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file
 from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
+from dotenv import load_dotenv
 import pandas as pd
 import numpy as np
 import io
@@ -19,16 +20,50 @@ import tempfile
 import pickle
 
 # Add project root to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
+sys.path.insert(0, PROJECT_ROOT)
 
 from audit_system.privacy_verifier import PrivacyVerifier, verify_privacy
 from audit_system.utility_verifier import UtilityVerifier, verify_utility
 from audit_system.bias_detector import BiasDetector, detect_bias
 from audit_system.consensus_engine import ConsensusEngine
 from audit_system.compliance_checker import ComplianceChecker
-from blockchain.api.blockchain_client import BlockchainClient, compute_data_hash
+from blockchain.api.blockchain_client import BlockchainClient, BlockchainMode, compute_data_hash
 from blockchain.api.verification_orchestrator import VerificationOrchestrator, verify_synthetic_data
 from ml_models.generators.auditable_ctgan import AuditableCTGAN
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    """Parse a boolean value from environment variables."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+APP_HOST = os.getenv('APP_HOST', '0.0.0.0')
+APP_PORT = int(os.getenv('APP_PORT', '5000'))
+APP_DEBUG = _env_bool('FLASK_DEBUG', True)
+
+MIN_VERIFIERS = int(os.getenv('VERIFICATION_MIN_VERIFIERS', '3'))
+APPROVAL_THRESHOLD = float(os.getenv('VERIFICATION_APPROVAL_THRESHOLD', '70.0'))
+
+_mode_value = os.getenv('BLOCKCHAIN_MODE', 'simulation').strip().lower()
+try:
+    BLOCKCHAIN_MODE = BlockchainMode(_mode_value)
+except ValueError:
+    BLOCKCHAIN_MODE = BlockchainMode.SIMULATION
+
+BLOCKCHAIN_CONFIG = {
+    'peer_endpoint': os.getenv('FABRIC_PEER_ENDPOINT', 'localhost:7051'),
+    'orderer_endpoint': os.getenv('FABRIC_ORDERER_ENDPOINT', 'localhost:7050'),
+    'channel_name': os.getenv('FABRIC_CHANNEL_NAME', 'auditchannel'),
+    'chaincode_name': os.getenv('FABRIC_CHAINCODE_NAME', 'audit_trail'),
+    'msp_id': os.getenv('FABRIC_MSP_ID', 'HospitalMSP'),
+    'tls_enabled': _env_bool('FABRIC_TLS_ENABLED', True),
+    'tls_cert_path': os.getenv('FABRIC_TLS_CERT_PATH', '')
+}
 
 
 # Custom JSON provider to handle numpy types
@@ -54,8 +89,12 @@ app.json = CustomJSONProvider(app)
 CORS(app)
 
 # Initialize components
-orchestrator = VerificationOrchestrator(min_verifiers=3, approval_threshold=70.0)
-blockchain = BlockchainClient()
+orchestrator = VerificationOrchestrator(
+    min_verifiers=MIN_VERIFIERS,
+    approval_threshold=APPROVAL_THRESHOLD,
+    blockchain_mode=BLOCKCHAIN_MODE
+)
+blockchain = BlockchainClient(mode=BLOCKCHAIN_MODE, config=BLOCKCHAIN_CONFIG)
 
 # Storage for uploaded data and generation jobs
 uploaded_data = {}
@@ -551,11 +590,17 @@ def generate_synthetic_data():
         model = None
         if use_cached:
             model = load_cached_model()
+            # Ignore incompatible cache artifacts (e.g., metadata dicts)
+            if model is not None and not (hasattr(model, 'generate') or hasattr(model, 'sample')):
+                model = None
         
         if model is not None:
             # Generate using cached model
             try:
-                synthetic_data = model.generate(num_rows)
+                if hasattr(model, 'generate'):
+                    synthetic_data = model.generate(num_rows)
+                else:
+                    synthetic_data = model.sample(num_rows)
                 generation_method = 'cached_model'
             except Exception as e:
                 print(f"Cached model generation failed: {e}")
@@ -570,7 +615,13 @@ def generate_synthetic_data():
                 categorical_columns = list(real_data.select_dtypes(include=['object', 'category']).columns)
             
             # For quick demo, use statistical sampling
-            synthetic_data = _quick_generate(real_data, num_rows, categorical_columns)
+            synthetic_data = _quick_generate(
+                real_data,
+                num_rows,
+                categorical_columns,
+                protected_attributes=upload.get('protected_attributes', []),
+                target_column=upload.get('target_column')
+            )
             generation_method = 'statistical_sampling'
         
         generation_time = time.time() - start_time
@@ -609,74 +660,59 @@ def generate_synthetic_data():
         return jsonify({'error': str(e)}), 500
 
 
-def _quick_generate(real_data: pd.DataFrame, num_rows: int, categorical_columns: list) -> pd.DataFrame:
+def _quick_generate(
+    real_data: pd.DataFrame,
+    num_rows: int,
+    categorical_columns: list,
+    protected_attributes: list = None,
+    target_column: str = None
+) -> pd.DataFrame:
     """
-    Improved statistical sampling for synthetic data generation.
-    Uses techniques that produce better privacy/utility/fairness scores.
+    Fast synthetic data generation for dashboard mode.
+
+        Strategy:
+        - Stratified bootstrap sample full rows to preserve multivariate relationships.
+        - When protected attributes/target are available, stratify by those columns
+            to better preserve fairness-related outcome rates.
+    - This keeps distributions and correlations closer to the real data,
+      improving utility and membership-inference privacy behavior compared
+      to per-column independent sampling.
     """
-    synthetic = pd.DataFrame()
-    
-    # Identify column types
-    cat_cols = set(categorical_columns) if categorical_columns else set()
+    if real_data is None or real_data.empty:
+        return pd.DataFrame()
+
+    protected_attributes = protected_attributes or []
+    strata_cols = [c for c in (protected_attributes + ([target_column] if target_column else [])) if c in real_data.columns]
+
+    if strata_cols:
+        # Stratified bootstrap to preserve protected-group outcome distributions.
+        grouped = real_data.groupby(strata_cols, dropna=False)
+        parts = []
+        total_rows = len(real_data)
+
+        for _, group in grouped:
+            n = max(1, int(round(len(group) * num_rows / total_rows)))
+            parts.append(group.sample(n=n, replace=True))
+
+        sampled = pd.concat(parts, ignore_index=True)
+
+        if len(sampled) > num_rows:
+            sampled = sampled.sample(n=num_rows, replace=False).reset_index(drop=True)
+        elif len(sampled) < num_rows:
+            extra = real_data.sample(n=num_rows - len(sampled), replace=True).reset_index(drop=True)
+            sampled = pd.concat([sampled, extra], ignore_index=True)
+    else:
+        sampled = real_data.sample(n=num_rows, replace=True).reset_index(drop=True)
+
+    # Keep original dtypes to avoid type drift that can inflate privacy attacks.
+    synthetic = sampled.copy()
     for col in real_data.columns:
-        if real_data[col].dtype == 'object' or real_data[col].nunique() < 20:
-            cat_cols.add(col)
-    
-    for col in real_data.columns:
-        if col in cat_cols:
-            # For categorical: preserve exact distribution
-            value_counts = real_data[col].value_counts(normalize=True)
-            synthetic[col] = np.random.choice(
-                value_counts.index, 
-                size=num_rows, 
-                p=value_counts.values
-            )
-        else:
-            # For numerical: use better techniques
-            col_data = real_data[col].dropna()
-            
-            if len(col_data) == 0:
-                synthetic[col] = [0] * num_rows
-                continue
-            
-            mean = col_data.mean()
-            std = col_data.std()
-            min_val = col_data.min()
-            max_val = col_data.max()
-            
-            if pd.isna(std) or std == 0:
-                # Constant column
-                synthetic[col] = [mean] * num_rows
-            else:
-                # Use kernel density estimation for better distribution matching
-                try:
-                    from scipy import stats
-                    kde = stats.gaussian_kde(col_data.values)
-                    samples = kde.resample(num_rows).flatten()
-                    # Clip to reasonable range (within 2 std of min/max)
-                    range_buffer = std * 0.5
-                    samples = np.clip(samples, min_val - range_buffer, max_val + range_buffer)
-                    synthetic[col] = samples
-                except:
-                    # Fallback to normal distribution with noise
-                    samples = np.random.normal(mean, std * 0.95, num_rows)  # Slightly reduce std
-                    samples = np.clip(samples, min_val, max_val)
-                    synthetic[col] = samples
-            
-            # Ensure same dtype
-            if real_data[col].dtype in ['int64', 'int32', 'int']:
-                synthetic[col] = synthetic[col].round().astype(int)
-    
-    # Add slight noise to avoid exact matches (privacy protection)
-    for col in synthetic.columns:
-        if col not in cat_cols and synthetic[col].dtype in ['float64', 'float32', 'int64', 'int32']:
-            noise_scale = 0.01 * (real_data[col].std() if pd.notna(real_data[col].std()) else 1)
-            if noise_scale > 0:
-                noise = np.random.normal(0, noise_scale, num_rows)
-                synthetic[col] = synthetic[col] + noise
-                if real_data[col].dtype in ['int64', 'int32']:
-                    synthetic[col] = synthetic[col].round().astype(int)
-    
+        try:
+            synthetic[col] = synthetic[col].astype(real_data[col].dtype)
+        except Exception:
+            # If coercion fails for edge cases, keep sampled dtype.
+            pass
+
     return synthetic
 
 
@@ -1229,7 +1265,8 @@ startxref
 def blockchain_stats():
     """Get blockchain statistics."""
     try:
-        stats = blockchain.get_blockchain_stats()
+        chain_client = getattr(orchestrator, 'blockchain', blockchain)
+        stats = chain_client.get_blockchain_stats()
         consensus_stats = orchestrator.consensus_engine.get_verification_stats()
         
         # Enhance stats for frontend
@@ -1241,6 +1278,18 @@ def blockchain_stats():
             'latest_block_hash': stats.get('latest_block_hash', ''),
             'mode': stats.get('mode', 'simulation')
         }
+
+        # Include recent blocks in simulation mode for the explorer UI.
+        if hasattr(chain_client, 'backend') and hasattr(chain_client.backend, 'chain'):
+            try:
+                recent_blocks = chain_client.backend.chain[-5:]
+                enhanced_stats['recent_blocks'] = [
+                    b.to_dict() if hasattr(b, 'to_dict') else b for b in recent_blocks
+                ]
+            except Exception:
+                enhanced_stats['recent_blocks'] = []
+        else:
+            enhanced_stats['recent_blocks'] = []
         
         return jsonify({
             'blockchain': enhanced_stats,
@@ -1250,6 +1299,25 @@ def blockchain_stats():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/blockchain/integrity', methods=['GET'])
+def blockchain_integrity():
+    """Backward-compatible endpoint for chain validity checks."""
+    try:
+        chain_client = getattr(orchestrator, 'blockchain', blockchain)
+        stats = chain_client.get_blockchain_stats()
+
+        return jsonify({
+            'is_valid': bool(stats.get('chain_valid', True)),
+            'chain_length': int(stats.get('chain_length', 0)),
+            'latest_block_hash': stats.get('latest_block_hash', ''),
+            'mode': stats.get('mode', 'simulation')
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'is_valid': False}), 500
 
 
 @app.route('/api/blockchain/verify', methods=['POST'])
@@ -1263,7 +1331,8 @@ def verify_blockchain_integrity():
         if not data_hash or not expected_hash:
             return jsonify({'error': 'Both data_hash and expected_hash required'}), 400
         
-        result = blockchain.verify_data_integrity(data_hash, expected_hash)
+        chain_client = getattr(orchestrator, 'blockchain', blockchain)
+        result = chain_client.verify_data_integrity(data_hash, expected_hash)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1341,4 +1410,4 @@ if __name__ == '__main__':
     os.makedirs(templates_dir, exist_ok=True)
     
     # Run the app
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host=APP_HOST, port=APP_PORT, debug=APP_DEBUG)

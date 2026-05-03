@@ -1,4 +1,4 @@
-/*
+  /*
  * Audit Trail Smart Contract - Rust Implementation
  * Hyperledger Fabric Chaincode for Synthetic Data Audit Trail
  * 

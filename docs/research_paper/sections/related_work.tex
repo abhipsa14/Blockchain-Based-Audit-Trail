@@ -1,51 +1,33 @@
-% Related Work Section
+% Related Work
 
-This section reviews existing work in synthetic data generation, blockchain-based data management, and privacy-preserving machine learning.
+Our work draws on three distinct areas of research: tabular synthetic data generation, blockchain-based provenance systems, and methods for measuring privacy and fairness in machine learning.
 
-\subsection{Synthetic Data Generation}
+\textbf{Tabular data synthesis with GANs.}
+Following Goodfellow et al.'s original adversarial training framework~\cite{goodfellow2014generative}, many GAN architectures have been modified for structured tabular data. CTGAN~\cite{xu2019ctgan} uses mode-specific normalisation and conditional training-by-sampling to model columns containing both continuous and categorical values. It is widely used as a baseline for tabular synthesis. CTAB-GAN+~\cite{zhao2022ctabgan} adds an auxiliary classifier to improve column-level accuracy. For formal privacy guarantees, PATE-GAN~\cite{jordon2018pate} integrates the Private Aggregation of Teacher Ensembles into its discriminator, and DP-CGAN~\cite{torkzadehmahani2020dp} applies carefully calibrated noise during gradient descent to satisfy a specific $(\varepsilon,\delta)$-differential-privacy budget. Sarmin et al.~\cite{sarmin2024privacy} evaluated these approaches and noted that single quality metrics cannot adequately measure both privacy and utility in synthetic data. Their observation directly informed the multi-metric design used in our system.
 
-\subsubsection{GAN-based Approaches}
-Generative Adversarial Networks (GANs) have revolutionized synthetic data generation. CTGAN \cite{xu2019ctgan} introduced mode-specific normalization for handling mixed-type tabular data, addressing mode collapse issues common in vanilla GANs. CTAB-GAN+ \cite{zhao2022ctabgan} further improved tabular synthesis through auxiliary classifier loss and training-by-sampling strategies.
+\textbf{Blockchain-backed data provenance.}
+Hyperledger Fabric~\cite{androulaki2018hyperledger} is a widely adopted permissioned ledger that supports pluggable consensus mechanisms, including Raft~\cite{ongaro2014search} and PBFT~\cite{castro1999practical}, as well as channel-level data isolation. Kuo et al.~\cite{kuo2017blockchain} demonstrated how to use ledgers to track patient record provenance without exposing the records themselves. Veeraragavan et al.~\cite{veeraragavan2024blockchain} proposed a permissioned marketplace allowing consumers to rate synthetic data generators after testing the data. Their trust evaluation is subjective and occurs post-distribution. Our approach differs structurally: (i)~we conduct objective, metric-driven evaluations \emph{before} writing the commit to the ledger, and (ii)~we use a median consensus algorithm to aggregate independent examiner results into a verifiable quality certificate.
 
-\subsubsection{Privacy-Preserving Generation}
-PATE-GAN \cite{jordon2018pate} pioneered differentially private synthetic data generation using teacher ensemble methods. DP-CGAN \cite{torkzadehmahani2020dp} extended this to conditional generation, while DTGAN \cite{kunar2021dtgan} optimized differential privacy specifically for tabular data.
+\textbf{Privacy and fairness measurement.}
+Sweeney's $k$-anonymity framework~\cite{sweeney2002k} and the membership inference attack presented by Shokri et al.~\cite{shokri2017membership} measure re-identification risk using different methods---the former groups quasi-identifiers, while the latter uses adversarial model training. Yao et al.~\cite{yao2025dcr} showed that the common distance-to-closest-record (DCR) metric can be unreliable when datasets are tightly clustered, which further supports the need for using multiple evaluation metrics. For fairness, Hardt et al.~\cite{hardt2016equality} established equalised odds to evaluate group parity, Feldman et al.~\cite{feldman2015certifying} applied the four-fifths rule for compliance audits, and Calmon et al.~\cite{calmon2017optimized} designed pre-processing techniques to reduce bias before training. Our system builds on these methods by applying group rebalancing and selection-rate alignment after the data generation step.
 
-\subsection{Blockchain for Data Provenance}
-
-\subsubsection{Permissioned Blockchain Frameworks}
-Hyperledger Fabric \cite{androulaki2018hyperledger} provides enterprise-grade permissioned blockchain with modular consensus and smart contract support. BLOCKBENCH \cite{dinh2017blockbench} established benchmarking frameworks for evaluating private blockchain performance.
-
-\subsubsection{Blockchain for AI Transparency}
-Recent work has explored blockchain for AI model provenance and audit trails. Veeraragavan et al. \cite{veeraragavan2024blockchain} proposed a permissioned blockchain framework for ranking synthetic data generators based on user reputation. However, their approach relies on post-hoc user ratings rather than objective quality verification.
-
-\subsection{Privacy Metrics and Evaluation}
-
-\subsubsection{Distance-based Metrics}
-Distance to Closest Record (DCR) measures the minimum distance between synthetic and real records to prevent memorization. However, recent work \cite{yao2025dcr} has shown that DCR alone is insufficient for privacy guarantees.
-
-\subsubsection{Attack-based Evaluation}
-Membership Inference Attacks (MIA) \cite{ward2025synthmia} provide more robust privacy evaluation by testing whether attackers can determine if specific records were in the training set. Our system incorporates both distance-based and attack-based metrics.
-
-\subsection{Research Gap}
-
-Existing approaches suffer from several limitations:
+\textbf{Gap in the existing literature.}
+Table~\ref{tab:comparison} outlines the differences in functionality. To our knowledge, no existing system provides all three of these capabilities: an objective pre-commit verification process using multiple metrics, an immutable consensus-based record on a permissioned ledger, and an integrated evaluation covering fairness metrics and regulatory compliance.
 
 \begin{table}[h]
 \centering
-\caption{Comparison with Existing Approaches}
+\caption{Feature comparison of existing approaches and our framework.}
 \begin{tabular}{lccc}
 \toprule
-\textbf{Feature} & \textbf{Centralized} & \textbf{Reputation} & \textbf{Ours} \\
+\textbf{Capability} & \textbf{Central.} & \textbf{Reput.} & \textbf{Ours} \\
 \midrule
-Pre-commit Verification & \checkmark & $\times$ & \checkmark \\
-Objective Metrics & \checkmark & $\times$ & \checkmark \\
-Tamper Resistance & $\times$ & \checkmark & \checkmark \\
-Distributed Consensus & $\times$ & $\times$ & \checkmark \\
-Reproducible Auditing & $\times$ & $\times$ & \checkmark \\
-Regulatory Compliance & Partial & $\times$ & \checkmark \\
+Pre-commit verification & \checkmark & $\times$ & \checkmark \\
+Objective quality metrics & \checkmark & $\times$ & \checkmark \\
+Tamper-proof recording & $\times$ & \checkmark & \checkmark \\
+Multi-party consensus & $\times$ & $\times$ & \checkmark \\
+Fairness audit & $\times$ & $\times$ & \checkmark \\
+Regulatory compliance map & Partial & $\times$ & \checkmark \\
 \bottomrule
 \end{tabular}
 \label{tab:comparison}
 \end{table}
-
-Our work addresses these gaps by combining objective verification metrics with blockchain-based consensus and immutable audit trails.

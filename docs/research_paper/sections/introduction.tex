@@ -1,42 +1,16 @@
-% Introduction Section
+% Introduction
 
-The rapid growth of machine learning applications has created an unprecedented demand for large-scale, high-quality datasets. However, obtaining such data often conflicts with privacy regulations like GDPR, HIPAA, and the EU AI Act, particularly in sensitive domains like healthcare and finance. Synthetic data generation has emerged as a promising solution, offering the ability to create artificial datasets that preserve statistical properties while protecting individual privacy \cite{xu2019ctgan}.
+While synthetic data models like the Conditional Tabular GAN (CTGAN)~\cite{xu2019ctgan} offer a powerful workaround to strict data sharing frameworks such as GDPR~\cite{gdpr2016regulation}, HIPAA~\cite{hipaa1996act}, and the EU AI Act~\cite{euaiact2024}, proving the quality and safety of the generated data remains a fundamental challenge. Currently, a data officer runs local, isolated validation scripts and shares a self-certified quality report alongside the synthetic data. This fragile paradigm forces down-stream consumers to blindly trust the generating entity, lacking an immutable audit trail and frequently overlooking vital fairness audits~\cite{hardt2016equality}.
 
-\subsection{Motivation}
+Distributed ledgers~\cite{nakamoto2008bitcoin} provide an avenue for tamper-proof provenance, but a blockchain cannot inherently verify the accuracy of the off-chain data being recorded---a limitation formally known as the ``oracle gap''~\cite{zheng2018blockchain}. This paper bridges that gap by cryptographically anchoring a rigorous, multi-metric objective evaluation system directly to the immutability of blockchain technology. 
 
-While synthetic data generators like CTGAN \cite{xu2019ctgan} have shown impressive capabilities in producing realistic tabular data, a critical challenge remains: \textbf{How do we trust the quality and privacy claims of synthetic data?}
+To systematically explore this architecture, we structure our investigation around five central questions targeting: \textbf{Q1} (\textit{Efficacy}) objective trust-score improvements over single-party certification; \textbf{Q2} (\textit{Efficiency}) computational consensus overhead; \textbf{Q3} (\textit{Resilience}) Byzantine fault-tolerance limits; \textbf{Q4} (\textit{Scalability}) latency relative to dataset size; and \textbf{Q5} (\textit{Necessity}) the distinct isolation value of individual verification metrics.
 
-Current approaches suffer from several limitations:
-\begin{itemize}
-    \item \textbf{Centralized Verification:} Single points of failure that can be compromised or manipulated
-    \item \textbf{Lack of Transparency:} No mechanism for independent verification of quality claims
-    \item \textbf{No Audit Trail:} Inability to trace the verification history of datasets
-    \item \textbf{Post-hoc Trust:} Reputation-based systems that detect problems only after damage is done
-\end{itemize}
-
-\subsection{The Oracle Problem}
-
-Blockchain technology provides immutability and transparency for data storage, but it cannot verify the \textit{correctness} of data being stored—a challenge known as the \textbf{oracle problem}. This creates a fundamental gap: blockchain secures the \textit{claims} about data quality, but not the \textit{truth} of those claims.
-
-\subsection{Research Questions}
-
-This work addresses the following research questions:
-\begin{enumerate}
-    \item \textbf{RQ1:} Does blockchain-based verification provide stronger trust guarantees than centralized approaches?
-    \item \textbf{RQ2:} What is the latency overhead of distributed verification compared to single-node verification?
-    \item \textbf{RQ3:} Can consensus mechanisms effectively detect and reject low-quality synthetic datasets?
-    \item \textbf{RQ4:} How does the system scale with increasing dataset sizes and number of verifiers?
+Our primary contributions are:
+\begin{enumerate}[leftmargin=*, itemsep=1pt]
+  \item A \textbf{two-tier verification architecture} segregating objective machine-learning evaluation from tamper-proof cryptographic recording via Byzantine-tolerant median consensus.
+  \item An \textbf{eleven-metric verification suite} spanning privacy (DCR, $k$-anonymity, MIA resilience, attribute disclosure), utility (Wasserstein, JS divergence, cross-correlation, TSTR ML efficacy), and fairness (four parity/impact constraints).
+  \item A network-agnostic \textbf{hash-chain audit logger} paired with an \textbf{automated compliance engine} directly mapping quantitative scores to 15 specific mandates within GDPR, HIPAA, and the EU AI Act.
+  \item An active \textbf{fairness post-processing module} that dynamically rectifies demographic imbalances during verification.
+  \item A \textbf{comprehensive empirical evaluation} on the UCI Adult Income dataset~\cite{dua2019uci}, detailing multi-node consensus latency, sub-linear temporal scaling, and ablation testing.
 \end{enumerate}
-
-\subsection{Contributions}
-
-This paper makes the following contributions:
-\begin{enumerate}
-    \item A \textbf{two-layer verification architecture} that combines comprehensive quality verification (Layer 1) with blockchain-based audit trails (Layer 2)
-    \item A \textbf{verification oracle} that bridges the gap between objective quality metrics and blockchain immutability
-    \item \textbf{Comprehensive metric suite} covering privacy (DCR, k-anonymity, membership inference), utility (statistical similarity, ML efficacy), and fairness (demographic parity, disparate impact)
-    \item \textbf{Consensus-based trust establishment} using multiple independent verifiers
-    \item \textbf{Complete implementation} using Hyperledger Fabric with extensive experimental evaluation
-\end{enumerate}
-
-The remainder of this paper is organized as follows: Section II reviews related work, Section III presents our proposed system, Section IV describes the implementation, Section V presents experimental evaluation, Section VI discusses results, and Section VII concludes with future directions.

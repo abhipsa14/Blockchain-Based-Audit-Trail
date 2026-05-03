@@ -33,3 +33,4 @@ pytest-cov
 # Utilities
 python-dotenv
 pyyaml
+requests

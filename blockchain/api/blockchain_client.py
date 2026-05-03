@@ -85,7 +85,16 @@ class SimulatedBlockchain:
     def _compute_hash(self, index: int, previous_hash: str, 
                       entries: List, nonce: int) -> str:
         """Compute block hash."""
-        content = f"{index}{previous_hash}{json.dumps([e.to_dict() if hasattr(e, 'to_dict') else e for e in entries])}{nonce}"
+        serialized_entries = []
+        for e in entries:
+            if hasattr(e, 'to_dict'):
+                entry_dict = e.to_dict()
+                # Exclude mutable field to keep block hash stable after mining.
+                entry_dict.pop('block_hash', None)
+                serialized_entries.append(entry_dict)
+            else:
+                serialized_entries.append(e)
+        content = f"{index}{previous_hash}{json.dumps(serialized_entries, sort_keys=True)}{nonce}"
         return hashlib.sha256(content.encode()).hexdigest()
     
     def add_entry(self, data_hash: str, entry_type: str, payload: Dict) -> str:

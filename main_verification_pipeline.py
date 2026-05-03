@@ -11,9 +11,11 @@ from datetime import datetime
 from pathlib import Path
 import pandas as pd
 import numpy as np
+from dotenv import load_dotenv
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent
+load_dotenv(PROJECT_ROOT / '.env')
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from audit_system.privacy_verifier import PrivacyVerifier, verify_privacy
@@ -631,13 +633,18 @@ class VerificationPipeline:
 
 def main():
     """Main entry point for the verification pipeline."""
+    default_real_data = os.getenv('DEFAULT_REAL_DATA', 'data/raw/adult.csv')
+    default_num_verifiers = int(os.getenv('VERIFICATION_MIN_VERIFIERS', '3'))
+    default_threshold = float(os.getenv('VERIFICATION_APPROVAL_THRESHOLD', '70.0'))
+    default_target_column = os.getenv('DEFAULT_TARGET_COLUMN', 'income')
+
     parser = argparse.ArgumentParser(
         description='Synthetic Data Verification Pipeline'
     )
     parser.add_argument(
         '--real-data',
         type=str,
-        default='data/raw/adult.csv',
+        default=default_real_data,
         help='Path to real data CSV'
     )
     parser.add_argument(
@@ -660,19 +667,19 @@ def main():
     parser.add_argument(
         '--num-verifiers',
         type=int,
-        default=3,
+        default=default_num_verifiers,
         help='Number of verifiers for consensus'
     )
     parser.add_argument(
         '--threshold',
         type=float,
-        default=70.0,
+        default=default_threshold,
         help='Approval threshold (0-100)'
     )
     parser.add_argument(
         '--target-column',
         type=str,
-        default='income',
+        default=default_target_column,
         help='Target column for ML efficacy tests'
     )
     parser.add_argument(
