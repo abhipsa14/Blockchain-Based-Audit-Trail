@@ -384,9 +384,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📧 Contact
 
-- **Author**: Ashish Pandey
-- **Email**: your.email@example.com
-- **Project Link**: https://github.com/yourusername/FY-Project
+- **Author**: Atul Maurya, Abhipsa Srivastava
+- **Email**: atulmaurya18.04@gmail.com, abhipsasri8183@gmail.com
 
 ## 🙏 Acknowledgments
 
